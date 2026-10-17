@@ -1,11 +1,15 @@
 package re.jerome.smartchest.client;
 
+import java.util.ArrayList;
+import java.util.List;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ItemStack;
 import re.jerome.smartchest.SmartChestMenu;
 import re.jerome.smartchest.SmartChestMod;
 
@@ -27,6 +31,16 @@ public class SmartChestScreen extends AbstractContainerScreen<SmartChestMenu> {
 		super(menu, inventory, title, PANEL_X + PANEL_WIDTH, 114 + menu.getRowCount() * 18);
 		rows = menu.getRowCount();
 		inventoryLabelY = imageHeight - 94;
+	}
+
+	@Override
+	protected List<Component> getTooltipFromContainerItem(ItemStack stack) {
+		List<Component> lines = new ArrayList<>(super.getTooltipFromContainerItem(stack));
+		// Why the capacity upgrade does not come out (SPEC §4.1).
+		if (hoveredSlot != null && menu.blocksRemoval(hoveredSlot)) {
+			lines.add(Component.translatable("container.smartchest.capacity_locked").withStyle(ChatFormatting.RED));
+		}
+		return lines;
 	}
 
 	@Override

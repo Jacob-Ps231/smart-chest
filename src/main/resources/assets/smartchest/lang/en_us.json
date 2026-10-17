@@ -11,6 +11,7 @@
   "block.smartchest.poplar_smart_chest": "Poplar Smart Chest",
   "block.smartchest.spruce_smart_chest": "Spruce Smart Chest",
   "block.smartchest.warped_smart_chest": "Warped Smart Chest",
+  "container.smartchest.capacity_locked": "Can't be taken out: a slot holds more than the cap without it",
   "container.smartchest.double_smart_chest": "Large Smart Chest",
   "container.smartchest.smart_chest": "Smart Chest",
   "item.smartchest.capacity_upgrade_128": "Capacity Upgrade (128)",

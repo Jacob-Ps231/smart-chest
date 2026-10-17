@@ -11,6 +11,7 @@
   "block.smartchest.poplar_smart_chest": "Coffre intelligent en peuplier",
   "block.smartchest.spruce_smart_chest": "Coffre intelligent en sapin",
   "block.smartchest.warped_smart_chest": "Coffre intelligent biscornu",
+  "container.smartchest.capacity_locked": "Impossible de la retirer : un emplacement dépasse le plafond sans elle",
   "container.smartchest.double_smart_chest": "Grand coffre intelligent",
   "container.smartchest.smart_chest": "Coffre intelligent",
   "item.smartchest.capacity_upgrade_128": "Amélioration de capacité (128)",

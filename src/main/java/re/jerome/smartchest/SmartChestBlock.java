@@ -10,6 +10,7 @@ import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.DoubleBlockCombiner;
@@ -46,6 +47,26 @@ public class SmartChestBlock extends ChestBlock {
 				}
 			};
 
+	// ChestBlock.getAnalogOutputSignal's container, measured against the caps of the
+	// first half's capacity upgrade, which applies to both halves.
+	private static final DoubleBlockCombiner.Combiner<ChestBlockEntity, Integer> SIGNALS =
+			new DoubleBlockCombiner.Combiner<>() {
+				@Override
+				public Integer acceptDouble(ChestBlockEntity first, ChestBlockEntity second) {
+					return SmartChestBlockEntity.redstoneSignal(new CompoundContainer(first, second), capacityUpgrade(first));
+				}
+
+				@Override
+				public Integer acceptSingle(ChestBlockEntity single) {
+					return SmartChestBlockEntity.redstoneSignal(single, capacityUpgrade(single));
+				}
+
+				@Override
+				public Integer acceptNone() {
+					return 0;
+				}
+			};
+
 	private final String wood;
 
 	public SmartChestBlock(String wood, Properties properties) {
@@ -69,6 +90,16 @@ public class SmartChestBlock extends ChestBlock {
 	@Override
 	protected MenuProvider getMenuProvider(BlockState state, Level level, BlockPos pos) {
 		return combine(state, level, pos, false).apply(MENU_PROVIDERS).orElse(null);
+	}
+
+	@Override
+	protected int getAnalogOutputSignal(BlockState state, Level level, BlockPos pos, Direction direction) {
+		// ChestBlock's reads Container.getMaxStackSize(ItemStack): the vanilla stack.
+		return combine(state, level, pos, false).apply(SIGNALS);
+	}
+
+	private static ItemStack capacityUpgrade(ChestBlockEntity chest) {
+		return ((SmartChestBlockEntity) chest).upgrades().getItem(SmartChestBlockEntity.CAPACITY_SLOT);
 	}
 
 	/** ChestBlock's double chest provider (an anonymous class there), step for step. */

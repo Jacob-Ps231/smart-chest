@@ -12,7 +12,7 @@ import net.minecraft.world.item.Items;
 
 public final class SmartChestItems {
 	// Lowest tier first: the tier of an upgrade is its index + 1, and its cap is
-	// capacity.tiers at the same index (SPEC §4). No effect before step 7.
+	// capacity.tiers at the same index (SPEC §4), read by SmartChestBlockEntity.maxStackSize.
 	public static final List<Item> CAPACITY_UPGRADES = List.of(
 			register("capacity_upgrade_128"),
 			register("capacity_upgrade_256"),
