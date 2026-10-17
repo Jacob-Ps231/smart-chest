@@ -1,0 +1,52 @@
+latch_front.png — le loquet, dessiné à la main
+==============================================
+
+Ce que c'est
+  Le loquet d'un coffre simple vu de face, à l'endroit, aux pixels exacts de la
+  texture du coffre (128×128 : une unité du modèle = 2 px). Le dessin donne à la
+  fois la forme du loquet et les couleurs de sa face avant.
+
+La règle
+  - Pixel opaque = du loquet. Pixel transparent = du vide. Rien d'autre : un
+    pixel semi-transparent fait échouer le script.
+  - Redessiner change donc aussi la forme : le script découpe les pixels opaques
+    en blocs (une ligne de pixels contigus de même relief, fusionnée avec la
+    même ligne au-dessous) et en fait les cubes du modèle. Il les écrit dans
+    src/client/java/re/jerome/smartchest/client/SmartChestLatch.java, qu'il ne
+    faut pas modifier à la main.
+  - La face avant prend exactement les couleurs du dessin. Les côtés, le
+    dessus, le dessous et l'arrière des cubes prennent la couleur du pixel de
+    bord voisin, assombrie pour le relief.
+  - Le relief vient de la couleur : palette cuivre = relief, autres couleurs =
+    creux. Les pixels d'une des cinq couleurs de la palette ci-dessous ont
+    l'épaisseur pleine (une unité, comme le loquet vanilla) ; tous les autres
+    pixels opaques reculent d'une demi-unité (1 px de la texture), comme une
+    pierre sertie en creux. Les petites parois du creux prennent la couleur du
+    cuivre voisin, assombrie. Un cuivre à peine différent de la palette passe
+    donc en creux : prendre les valeurs exactes.
+
+La palette cuivre (en relief), tirée de copper_ingot.png du jeu
+  #6D3421  contour   le bord sombre de la silhouette
+  #9C4529  ombre     le côté bas et droit
+  #C15A36  base      la teinte du métal
+  #E77C56  clair     le côté haut et gauche
+  #FC9982  éclat     un pixel de lumière, en haut à gauche
+
+  Toute autre couleur est en creux. Le loquet actuel y met sa pierre redstone :
+  #FF9A20 éclat orange, #D9150A rouge, #7A0802 rouge sombre.
+
+La taille et la position
+  - L'image fait toujours 10×11 px : le script refuse une autre taille.
+  - Toute l'image est peignable. La position est fixe : le milieu de l'image
+    (entre les colonnes 4 et 5) est le milieu du coffre ; la ligne 0 va de
+    10,5 à 11 unités du bas du coffre, la ligne 10 de 5,5 à 6. La bande sombre
+    de la jointure couvercle/caisse passe derrière les lignes 2 à 5.
+  - Le loquet entier bouge avec le couvercle, comme le loquet vanilla.
+  - Le même dessin sert aux 12 bois. Sur le double coffre, chaque moitié prend
+    sa moitié du dessin : le milieu de l'image tombe sur la jonction.
+  - Un très grand nombre de blocs ne tiendrait plus dans la texture : le script
+    le signale.
+
+Après le dessin, depuis la racine du projet :
+  java tools/GenerateWoods.java C:/gradle-home/caches/fabric-loom/26.3/minecraft-merged.jar
+  ./gradlew runClient

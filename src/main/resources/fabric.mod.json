@@ -17,6 +17,7 @@
 			"re.jerome.smartchest.client.SmartChestClient"
 		]
 	},
+	"accessWidener": "smartchest.accesswidener",
 	"mixins": [
 		"smartchest.mixins.json"
 	],

@@ -3,7 +3,7 @@
     "type": "minecraft:special",
     "base": "smartchest:item/pale_oak_smart_chest",
     "model": {
-      "type": "minecraft:chest",
+      "type": "smartchest:chest",
       "texture": "smartchest:pale_oak"
     }
   }

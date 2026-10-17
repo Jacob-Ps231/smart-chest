@@ -3,6 +3,8 @@ plugins {
 }
 
 loom {
+	accessWidenerPath = file("src/main/resources/smartchest.accesswidener")
+
 	// Client-only code lives in src/client and is invisible to src/main, so the
 	// compiler catches any client class that leaks into common or server code.
 	splitEnvironmentSourceSets()

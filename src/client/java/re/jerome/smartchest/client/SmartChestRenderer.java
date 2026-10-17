@@ -22,7 +22,8 @@ import re.jerome.smartchest.SmartChestMod;
 
 // ChestRenderer picks its texture from a closed enum (Sheets.chooseSprite), so
 // this keeps its state extraction -- type, facing, lid, light of a double chest --
-// and redoes only submit, with the textures of the chest's wood.
+// and redoes only submit, with the textures of the chest's wood and the model of
+// SmartChestLayers.
 public class SmartChestRenderer extends ChestRenderer<SmartChestBlockEntity> {
 	private final SpriteGetter sprites;
 	private final MultiblockChestResources<ChestModel> models;
@@ -30,9 +31,9 @@ public class SmartChestRenderer extends ChestRenderer<SmartChestBlockEntity> {
 
 	public SmartChestRenderer(BlockEntityRendererProvider.Context context) {
 		super(context);
-		// Same as ChestRenderer's own fields, which are private.
+		// Same as ChestRenderer's own sprites, which is private.
 		sprites = context.sprites();
-		models = LAYERS.map(layer -> new ChestModel(context.bakeLayer(layer)));
+		models = SmartChestLayers.ALL.map(layer -> new ChestModel(context.bakeLayer(layer)));
 	}
 
 	@Override

@@ -12,6 +12,10 @@ remappedSrc/
 # Local references
 ref/
 Craft upgrade*.png
+# Generative AI concepts: references only, never in the repository (Modrinth 6.2a)
+Concept coffre*
+# Annotated in-game screenshots from Jerome's trials
+/test*.png
 
 # IDE
 .idea/
