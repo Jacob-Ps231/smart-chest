@@ -1,0 +1,10 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "smartchest:item/warped_smart_chest",
+    "model": {
+      "type": "minecraft:chest",
+      "texture": "smartchest:warped"
+    }
+  }
+}

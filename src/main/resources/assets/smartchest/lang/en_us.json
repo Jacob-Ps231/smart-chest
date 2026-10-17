@@ -1,4 +1,15 @@
 {
+  "block.smartchest.acacia_smart_chest": "Acacia Smart Chest",
+  "block.smartchest.birch_smart_chest": "Birch Smart Chest",
+  "block.smartchest.cherry_smart_chest": "Cherry Smart Chest",
+  "block.smartchest.crimson_smart_chest": "Crimson Smart Chest",
+  "block.smartchest.dark_oak_smart_chest": "Dark Oak Smart Chest",
+  "block.smartchest.jungle_smart_chest": "Jungle Smart Chest",
+  "block.smartchest.mangrove_smart_chest": "Mangrove Smart Chest",
   "block.smartchest.oak_smart_chest": "Oak Smart Chest",
+  "block.smartchest.pale_oak_smart_chest": "Pale Oak Smart Chest",
+  "block.smartchest.poplar_smart_chest": "Poplar Smart Chest",
+  "block.smartchest.spruce_smart_chest": "Spruce Smart Chest",
+  "block.smartchest.warped_smart_chest": "Warped Smart Chest",
   "container.smartchest.smart_chest": "Smart Chest"
 }

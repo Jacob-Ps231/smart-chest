@@ -1,0 +1,10 @@
+{
+  "model": {
+    "type": "minecraft:special",
+    "base": "smartchest:item/poplar_smart_chest",
+    "model": {
+      "type": "minecraft:chest",
+      "texture": "smartchest:poplar"
+    }
+  }
+}

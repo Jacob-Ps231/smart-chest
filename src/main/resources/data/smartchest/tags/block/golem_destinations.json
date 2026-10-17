@@ -1,5 +1,16 @@
 {
   "values": [
-    "smartchest:oak_smart_chest"
+    "smartchest:oak_smart_chest",
+    "smartchest:spruce_smart_chest",
+    "smartchest:birch_smart_chest",
+    "smartchest:jungle_smart_chest",
+    "smartchest:acacia_smart_chest",
+    "smartchest:dark_oak_smart_chest",
+    "smartchest:mangrove_smart_chest",
+    "smartchest:cherry_smart_chest",
+    "smartchest:pale_oak_smart_chest",
+    "smartchest:poplar_smart_chest",
+    "smartchest:crimson_smart_chest",
+    "smartchest:warped_smart_chest"
   ]
 }

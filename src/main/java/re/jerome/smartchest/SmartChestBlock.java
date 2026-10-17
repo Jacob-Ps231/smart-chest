@@ -9,7 +9,7 @@ import net.minecraft.world.level.block.state.BlockState;
 // Extending ChestBlock is what the copper golem needs (SPEC §3), and it brings the
 // double chest, hoppers and comparators along. ChestBlock.chestCanConnectTo is
 // state.is(this): a Smart Chest only pairs with the same block, so never with a
-// vanilla chest nor, from step 5 on, with another wood.
+// vanilla chest nor with another wood: DoubleBlockCombiner tests the same identity.
 public class SmartChestBlock extends ChestBlock {
 	private final String wood;
 

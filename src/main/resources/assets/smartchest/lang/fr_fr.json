@@ -1,4 +1,15 @@
 {
+  "block.smartchest.acacia_smart_chest": "Coffre intelligent en acacia",
+  "block.smartchest.birch_smart_chest": "Coffre intelligent en bouleau",
+  "block.smartchest.cherry_smart_chest": "Coffre intelligent en cerisier",
+  "block.smartchest.crimson_smart_chest": "Coffre intelligent carmin",
+  "block.smartchest.dark_oak_smart_chest": "Coffre intelligent en chêne noir",
+  "block.smartchest.jungle_smart_chest": "Coffre intelligent en acajou",
+  "block.smartchest.mangrove_smart_chest": "Coffre intelligent en palétuvier",
   "block.smartchest.oak_smart_chest": "Coffre intelligent en chêne",
+  "block.smartchest.pale_oak_smart_chest": "Coffre intelligent en chêne pâle",
+  "block.smartchest.poplar_smart_chest": "Coffre intelligent en peuplier",
+  "block.smartchest.spruce_smart_chest": "Coffre intelligent en sapin",
+  "block.smartchest.warped_smart_chest": "Coffre intelligent biscornu",
   "container.smartchest.smart_chest": "Coffre intelligent"
 }
