@@ -10,6 +10,7 @@ public class SmartChestMod implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
+		SmartChestConfig.load();
 		LOGGER.info("Smart Chest loaded");
 	}
 }

@@ -5,7 +5,7 @@ Les instructions de travail permanentes sont dans `CLAUDE.md`, les pièges de la
 machine et de Minecraft 26.3 dans `../SETUP-MC-MODDING-26.3.md` (et §1 et §4 de
 `../SETUP-MC-MODDING-26.2.md`).
 
-Statut : étape 1 (squelette) codée, en attente de validation en jeu. Prochaine session : étape 2.
+Statut : étapes 1 et 2 faites. Prochaine session : étape 3.
 Dernière mise à jour : 17/10/2026.
 
 Conventions de ce fichier :
@@ -177,16 +177,27 @@ Implémenté à l'étape : 8.
 
 ---
 
-## 6. Configuration ❓
+## 6. Configuration 🔷
 
 Format et rechargement : 🔷 JSON dans `config/smartchest.json`, lu au démarrage
-(`FabricLoader.getInstance().getConfigDir()`), redémarrage requis. Mettre la
-configuration **avant** tout ce qui a des valeurs à régler (étape 2).
+(`FabricLoader.getInstance().getConfigDir()`), redémarrage requis. Classe
+`SmartChestConfig`, lue par `SmartChestMod.onInitialize`, valeurs par
+`SmartChestConfig.get()`.
 
-| Section | Contenu |
-| --- | --- |
-| `capacity` | les quatre paliers (128, 256, 512, 999) ; borne haute 999 imposée par le codec |
-| `compression` | activée oui/non |
+| Clé | Défaut | Règle |
+| --- | --- | --- |
+| `capacity.tiers` | `[128, 256, 512, 999]` | 4 entiers **strictement** croissants 🔷, chacun de 2 à 999 |
+| `compression.enabled` | `true` | booléen |
+
+- Le fichier est **écrit seulement s'il manque**, avec toutes les clés et une clé
+  `_comment` (le JSON n'a pas de commentaires ; le lecteur l'ignore).
+- Une clé absente prend son défaut (`optionalFieldOf`).
+- Fichier invalide (JSON cassé, valeur hors bornes, paliers non croissants, pas
+  quatre paliers) : avertissement au log avec la raison, **tout** le fichier est
+  remplacé par les défauts en mémoire 🔷 (pas de mélange partiel), et le fichier
+  n'est **jamais réécrit**.
+- Le log du démarrage donne le chemin et les valeurs retenues :
+  `Config …smartchest.json: capacity tiers [...], compression enabled ...`.
 
 ---
 
@@ -265,8 +276,8 @@ obligatoires de `CLAUDE.md`.
 
 | # | Étape | Contenu | Validé quand | État |
 | --- | --- | --- | --- | --- |
-| 1 | Squelette | wrapper Gradle, `fabric.mod.json`, licence, `.gitattributes`, build vide | le jeu se lance avec le mod listé, sans crash | codée, à valider |
-| 2 | Configuration | `smartchest.json`, lecture au démarrage, valeurs par défaut | le fichier est généré et une valeur modifiée est lue (log) | |
+| 1 | Squelette | wrapper Gradle, `fabric.mod.json`, licence, `.gitattributes`, build vide | le jeu se lance avec le mod listé, sans crash | ✅ faite |
+| 2 | Configuration | `smartchest.json`, lecture au démarrage, valeurs par défaut | le fichier est généré et une valeur modifiée est lue (log) | ✅ faite |
 | 3 | Coffre de base | `SmartChestBlock`/`BlockEntity` (chêne seul), double coffre, recette, onglet créatif, modèle et texture provisoires, contenu lâché à la casse | je le pose, le remplis, le fusionne en double, relance le monde : tout est là. Entonnoir et comparateur fonctionnent | |
 | 4 | Golem de cuivre | mixin `CopperGolemAi`, tag `golem_destinations` | un golem prend dans un coffre de cuivre et dépose dans mon coffre, à plusieurs reprises, double coffre compris | |
 | 5 | Variantes de bois | script de génération, tous les bois | chaque bois se pose, se fusionne avec le même bois seulement, golem compatible | |
@@ -305,3 +316,4 @@ réseau, arithmétique), 8 (arithmétique, persistance).
 | 17/10/2026 | ⚠️ **Le golem ne dépose que dans `Blocks.CHEST` / `TRAPPED_CHEST`**, par identité de bloc, et pas dans un tag : « être un coffre » ne suffit pas, un mixin sur `CopperGolemAi` est inévitable. Relevé au `javap` sur le jar 26.3. |
 | 17/10/2026 | ⚠️ **Un `ItemStack` plafonne à 99 dans son codec** : le 999 ne peut pas passer par `ItemStack.CODEC`. Sauvegarde du compteur à part. |
 | 17/10/2026 | Étape 1 : squelette calqué sur le projet voisin (Master Sword 26.3). `splitEnvironmentSourceSets` gardé d'avance pour l'écran de l'étape 6. Point d'entrée `SmartChestMod` (main seulement, ni mixin ni entrée client). Pas d'icône : aucune image d'origine établie (règle Modrinth). `build` vert, `runClient` lance et logue « Smart Chest loaded ». |
+| 17/10/2026 | Étape 2 : `SmartChestConfig`, deux codecs sur la même liste de champs (lecture `optionalFieldOf`, écriture `fieldOf`), comme Master Sword. **Différence voulue** : Master Sword réécrit son fichier normalisé à chaque chargement, ce qui écrase un fichier invalide par les défauts ; ici le fichier n'est écrit que s'il manque. `result()` plutôt que `resultOrPartial()` : un résultat partiel mêlerait valeurs du joueur et défauts sans que le log dise lesquels. Paliers en liste, taille et ordre contrôlés dans un `validate`. ⚠️ Pas `listOf(4, 4)` : DFU écarte d'abord l'élément hors bornes, puis le contrôle de taille masque l'erreur (`1000` donnait « List is too short: 3 »). Cas testés sous `runServer` : absent (généré), partiel, non croissant, hors bornes, trois paliers, JSON cassé — fichier jamais modifié. Validé en jeu par Jérôme : palier 1 passé à 100, relancé, le log affiche `[100, 256, 512, 999]`. Pas de relecture par sous-agent : hors catégories obligatoires de `CLAUDE.md`. Signatures DFU 10.0.21, Gson 2.14.0, `StrictJsonParser.parse(Reader)` et `FabricLoader.getConfigDir()` lues au `javap`. ⚠️ La borne 999 n'est pas celle du codec d'`ItemStack` (qui s'arrête à 99, §4.1) : c'est un choix du design. |
