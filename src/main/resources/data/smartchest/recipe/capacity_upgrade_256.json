@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "key": {
+    "A": "minecraft:amethyst_shard",
+    "L": "minecraft:lapis_lazuli",
+    "M": "minecraft:gold_ingot",
+    "O": "minecraft:observer",
+    "P": "minecraft:piston",
+    "R": "minecraft:redstone"
+  },
+  "pattern": [
+    "LOL",
+    "AMA",
+    "RPR"
+  ],
+  "result": {
+    "id": "smartchest:capacity_upgrade_256"
+  }
+}

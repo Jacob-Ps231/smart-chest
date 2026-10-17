@@ -17,6 +17,7 @@ public class SmartChestMod implements ModInitializer {
 	public void onInitialize() {
 		SmartChestConfig.load();
 		SmartChestBlocks.register();
+		SmartChestItems.register();
 		LOGGER.info("Smart Chest loaded");
 	}
 }

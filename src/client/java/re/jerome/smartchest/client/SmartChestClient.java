@@ -3,6 +3,7 @@ package re.jerome.smartchest.client;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.rendering.v1.BlockEntityRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.ModelLayerRegistry;
+import net.minecraft.client.gui.screens.MenuScreens;
 import net.minecraft.client.renderer.special.SpecialModelRenderers;
 import net.minecraft.world.level.block.state.properties.ChestType;
 import re.jerome.smartchest.SmartChestBlocks;
@@ -20,5 +21,8 @@ public class SmartChestClient implements ClientModInitializer {
 		// BlockEntityRenderers keeps its register private; Fabric's registry is
 		// deprecated without a replacement, and still the only way in.
 		BlockEntityRendererRegistry.register(SmartChestBlocks.BLOCK_ENTITY, SmartChestRenderer::new);
+		// Private in vanilla, opened by Fabric API (transitive access wideners).
+		MenuScreens.register(SmartChestBlocks.MENU, SmartChestScreen::new);
+		MenuScreens.register(SmartChestBlocks.DOUBLE_MENU, SmartChestScreen::new);
 	}
 }

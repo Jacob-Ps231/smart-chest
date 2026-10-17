@@ -690,11 +690,14 @@ public class GenerateWoods {
 			}
 		}
 
-		// No file left over from a wood no longer in the list.
+		// No file left over from a wood no longer in the list. The upgrades share the
+		// item, model and recipe folders, with their own script: chest files only.
 		for (Path dir : List.of(ASSETS.resolve("blockstates"), ASSETS.resolve("models/block"), ASSETS.resolve("models/item"),
 				ASSETS.resolve("items"), TEXTURES, DATA.resolve("smartchest/recipe"), DATA.resolve("smartchest/loot_table/blocks"))) {
 			try (Stream<Path> files = Files.list(dir)) {
-				files.filter(file -> !written.containsKey(file)).forEach(file -> errors.add("unexpected " + file));
+				files.filter(file -> !written.containsKey(file))
+						.filter(file -> dir.equals(TEXTURES) || file.getFileName().toString().endsWith("_smart_chest.json"))
+						.forEach(file -> errors.add("unexpected " + file));
 			}
 		}
 

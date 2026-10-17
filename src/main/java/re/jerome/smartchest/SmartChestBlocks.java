@@ -9,6 +9,8 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.flag.FeatureFlags;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
@@ -23,7 +25,7 @@ import net.minecraft.world.level.block.state.properties.NoteBlockInstrument;
 
 public final class SmartChestBlocks {
 	// Vanilla keeps its tab keys private.
-	private static final ResourceKey<CreativeModeTab> FUNCTIONAL_BLOCKS = ResourceKey.create(
+	static final ResourceKey<CreativeModeTab> FUNCTIONAL_BLOCKS = ResourceKey.create(
 			Registries.CREATIVE_MODE_TAB, Identifier.withDefaultNamespace("functional_blocks"));
 
 	// The vanilla woods but bamboo (SPEC §2), in the creative tab order. The same
@@ -48,6 +50,12 @@ public final class SmartChestBlocks {
 			BuiltInRegistries.BLOCK_ENTITY_TYPE,
 			ResourceKey.create(Registries.BLOCK_ENTITY_TYPE, SmartChestMod.id("smart_chest")),
 			new BlockEntityType<>(SmartChestBlockEntity::new, Set.copyOf(ALL)));
+
+	// One type per size, as vanilla has GENERIC_9x3 and 9x6: the client builds the
+	// menu from the type alone, so no opening data is needed. The constructor is
+	// private in vanilla, opened by Fabric API (transitive access wideners).
+	public static final MenuType<SmartChestMenu> MENU = registerMenu("smart_chest", SmartChestMenu::single);
+	public static final MenuType<SmartChestMenu> DOUBLE_MENU = registerMenu("double_smart_chest", SmartChestMenu::twoHalves);
 
 	private SmartChestBlocks() {
 	}
@@ -79,6 +87,10 @@ public final class SmartChestBlocks {
 				.useBlockDescriptionPrefix()
 				.setId(itemKey)));
 		return block;
+	}
+
+	private static MenuType<SmartChestMenu> registerMenu(String name, MenuType.MenuSupplier<SmartChestMenu> client) {
+		return Registry.register(BuiltInRegistries.MENU, SmartChestMod.id(name), new MenuType<>(client, FeatureFlags.VANILLA_SET));
 	}
 
 	public static void register() {
