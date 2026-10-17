@@ -12,6 +12,9 @@
 	"entrypoints": {
 		"main": [
 			"re.jerome.smartchest.SmartChestMod"
+		],
+		"client": [
+			"re.jerome.smartchest.client.SmartChestClient"
 		]
 	},
 	"depends": {
