@@ -5,7 +5,7 @@ Les instructions de travail permanentes sont dans `CLAUDE.md`, les pièges de la
 machine et de Minecraft 26.3 dans `../SETUP-MC-MODDING-26.3.md` (et §1 et §4 de
 `../SETUP-MC-MODDING-26.2.md`).
 
-Statut : étapes 1 à 3 faites. Prochaine session : étape 4.
+Statut : étapes 1 à 4 faites. Prochaine session : étape 5.
 Dernière mise à jour : 17/10/2026.
 
 Conventions de ce fichier :
@@ -72,7 +72,52 @@ Les améliorations sont rendues par l'écran seulement, et lâchées à la casse
 | `shouldQueueForTarget` teste `blockEntity instanceof ChestBlockEntity` | Faire étendre `ChestBlockEntity` à notre block entity (constructeur `protected` avec `BlockEntityType` : accessible). Gagne gratuitement la file d'attente et l'animation du couvercle. |
 | `getBlockEntityContainer` : `block instanceof ChestBlock` → `ChestBlock.getContainer(...)` (gère le double coffre), sinon `blockEntity instanceof Container` | Faire étendre `ChestBlock` à notre bloc. |
 | `addItemsToContainer` fusionne avec `ItemStack.getMaxStackSize()` — la limite **de l'objet**, pas celle du conteneur — et écrit par `Container.setItem` | Le golem n'ira jamais au-delà du stack vanilla dans un emplacement amélioré (acceptable, c'est vanilla). Surtout : **il contourne toute logique placée dans une méthode d'insertion** → l'autocraft doit réagir à `setItem`/`setChanged`, pas à un chemin d'insertion (voir §5). |
-| `matchesLeavingItemsRequirement` appelle `Container.isEmpty()` puis `hasItemMatchingHandItem` | Le golem trie par objet : à lire en détail à l'étape 4 avant de promettre un comportement. |
+| `matchesLeavingItemsRequirement` : `container.isEmpty() \|\| hasItemMatchingHandItem(...)`, lu en entier à l'étape 4 | Voir la règle exacte ci-dessous. |
+
+**Règle exacte du golem** (relevée au `javap` à l'étape 4, `TransportItemsBetweenContainers`) :
+
+- **Choix de la cible** : parmi les block entities `instanceof ChestBlockEntity`
+  des chunks chargés autour de lui, dans une boîte de **32 blocs à l'horizontale
+  et 8 à la verticale** (1 et 1 s'il est monté), la plus proche d'abord. Une
+  cible est écartée si son prédicat de bloc ne convient pas (source si la main
+  est vide, destination sinon), si elle a déjà été visitée ou jugée
+  inaccessible, ou si elle est verrouillée (`isLocked`). Elle est notée visitée
+  dès qu'elle est choisie ; la liste des visitées est effacée après chaque prise
+  ou dépôt réussi.
+- **En route** : la cible est abandonnée si le dessus la bloque
+  (`ChestBlock.isChestBlockedAt`, bloc opaque **ou chat assis**) ; elle est
+  marquée inaccessible si le chemin échoue ou s'il ne voit aucune de ses faces.
+- **Prendre** (main vide) : un coffre de `#minecraft:copper_chests`. Arrivé
+  devant, il prend s'il **n'est pas vide** : `min(16, nombre)` du **premier
+  emplacement non vide**.
+- **Déposer** (main pleine) : un bloc du prédicat de destination. Arrivé
+  devant, il dépose si le coffre est **vide**, ou s'il contient **déjà au moins
+  une pile du même objet** (`ItemStack.isSameItem` : même item, composants
+  ignorés). Sinon il abandonne la cible (déjà notée visitée) et en cherche une
+  autre.
+- **Insertion** (`addItemsToContainer`) : emplacements dans l'ordre ; le
+  **premier emplacement vide prend toute la main**, une pile du même objet
+  *et* des mêmes composants (`isSameItemSameComponents`) se complète jusqu'à
+  `ItemStack.getMaxStackSize()`. Une pile incomplète placée *après* un
+  emplacement vide n'est donc pas complétée.
+- **Double coffre** : chaque moitié est trouvée séparément (c'est un
+  `ChestBlockEntity`) ; une moitié visitée, ou occupée par un autre mob, compte
+  pour les deux (`ChestBlock.TYPE`, `getConnectedBlockPos`). Le conteneur est le
+  `CompoundContainer` de `ChestBlock.getContainer`.
+- ⚠️ **Limites du tag** : seul un bloc dont le block entity est un
+  `ChestBlockEntity` peut servir (un tonneau ajouté au tag reste ignoré). Un
+  coffre de cuivre ajouté au tag par datapack deviendrait source **et**
+  destination : le golem reposerait sur place ce qu'il vient de prendre. Pas de
+  garde-fou dans le code (le tag ne contient que nos coffres).
+
+**Mixin (étape 4)** : `@Inject` en `TAIL` du `<clinit>` de `CopperGolemAi`, avec
+`@Shadow @Final @Mutable` sur `TRANSPORT_ITEM_DESTINATION_BLOCK`, qui devient
+`vanilla.or(state -> state.is(#smartchest:golem_destinations))`. Le champ n'est
+lu que par `initIdleActivity()` (`getstatic` passé au constructeur de
+`TransportItemsBetweenContainers`, qui le copie dans `destinationBlockType`),
+appelée par `getActivities()` à la création d'un cerveau de golem : toujours
+après le `<clinit>`. Coffre et coffre piégé vanilla gardent leur test intact,
+évalué en premier.
 
 Le golem ne voit que le conteneur principal (jamais les améliorations, §2.2).
 
@@ -266,14 +311,18 @@ Gradle `9.6.0`, JDK `25`, aucune mappings. Loom **1.17**, pas 1.18.
       avec 999.)
 - [ ] `AbstractContainerMenu.doClick` / `quickMoveStack` : où se lit la limite
       de fusion (`Slot.getMaxStackSize(ItemStack)` ou `ItemStack`) ?
-- [ ] `matchesLeavingItemsRequirement` du golem, lu en entier (§3).
+- [x] `matchesLeavingItemsRequirement` du golem, lu en entier : coffre vide ou même objet déjà présent (§3). Étape 4.
 - [ ] `MenuType` : choisir entre `ExtendedScreenHandlerType` (Fabric) et un
       `MenuType` simple + `ContainerData`.
 - [ ] Format exact des recettes `crafting_shaped`/`shapeless` en 26.3 (les
       recettes sont un registre rechargeable depuis 26.3) et API du
       `RecipeManager` côté serveur.
-- [ ] Mixin `<clinit>` sur un `static final` privé : `@Mutable @Shadow`, puis
+- [x] Mixin `<clinit>` sur un `static final` privé : `@Mutable @Shadow`, puis
       export du bytecode (`-Dmixin.debug.export=true`) pour lire l'injection.
+      Étape 4 : dans `run/.mixin.out`, le champ a perdu `final` et le handler
+      est appelé après le second `putstatic`, juste avant le `return`.
+      Étape 4 : dans `run/.mixin.out`, le champ a perdu `final` et le handler
+      est appelé après le second `putstatic`, juste avant le `return`.
 
 ---
 
@@ -288,7 +337,7 @@ obligatoires de `CLAUDE.md`.
 | 1 | Squelette | wrapper Gradle, `fabric.mod.json`, licence, `.gitattributes`, build vide | le jeu se lance avec le mod listé, sans crash | ✅ faite |
 | 2 | Configuration | `smartchest.json`, lecture au démarrage, valeurs par défaut | le fichier est généré et une valeur modifiée est lue (log) | ✅ faite |
 | 3 | Coffre de base | `SmartChestBlock`/`BlockEntity` (chêne seul), double coffre, recette, onglet créatif, modèle et texture provisoires, contenu lâché à la casse | je le pose, le remplis, le fusionne en double, relance le monde : tout est là. Entonnoir et comparateur fonctionnent | ✅ faite |
-| 4 | Golem de cuivre | mixin `CopperGolemAi`, tag `golem_destinations` | un golem prend dans un coffre de cuivre et dépose dans mon coffre, à plusieurs reprises, double coffre compris | |
+| 4 | Golem de cuivre | mixin `CopperGolemAi`, tag `golem_destinations` | un golem prend dans un coffre de cuivre et dépose dans mon coffre, à plusieurs reprises, double coffre compris | ✅ faite |
 | 5 | Variantes de bois | script de génération, tous les bois | chaque bois se pose, se fusionne avec le même bois seulement, golem compatible | |
 | 6 | Emplacements d'amélioration | conteneur à part, `MenuType`, écran, `Slot` maison, NBT, lâchés à la casse | l'écran montre 27 + 2 emplacements ; un objet y reste après relance ; golem et entonnoir ne s'y servent pas | |
 | 7 | Amélioration de capacité | 4 items, plafonds, sauvegarde du compteur hors codec, réseau, entonnoir, comparateur | 999 potions dans un emplacement, relance du monde, tout est là ; retirer l'amélioration refusé si dépassement | |
@@ -328,3 +377,4 @@ réseau, arithmétique), 8 (arithmétique, persistance).
 | 17/10/2026 | Étape 1 : squelette calqué sur le projet voisin (Master Sword 26.3). `splitEnvironmentSourceSets` gardé d'avance pour l'écran de l'étape 6. Point d'entrée `SmartChestMod` (main seulement, ni mixin ni entrée client). Pas d'icône : aucune image d'origine établie (règle Modrinth). `build` vert, `runClient` lance et logue « Smart Chest loaded ». |
 | 17/10/2026 | Étape 2 : `SmartChestConfig`, deux codecs sur la même liste de champs (lecture `optionalFieldOf`, écriture `fieldOf`), comme Master Sword. **Différence voulue** : Master Sword réécrit son fichier normalisé à chaque chargement, ce qui écrase un fichier invalide par les défauts ; ici le fichier n'est écrit que s'il manque. `result()` plutôt que `resultOrPartial()` : un résultat partiel mêlerait valeurs du joueur et défauts sans que le log dise lesquels. Paliers en liste, taille et ordre contrôlés dans un `validate`. ⚠️ Pas `listOf(4, 4)` : DFU écarte d'abord l'élément hors bornes, puis le contrôle de taille masque l'erreur (`1000` donnait « List is too short: 3 »). Cas testés sous `runServer` : absent (généré), partiel, non croissant, hors bornes, trois paliers, JSON cassé — fichier jamais modifié. Validé en jeu par Jérôme : palier 1 passé à 100, relancé, le log affiche `[100, 256, 512, 999]`. Pas de relecture par sous-agent : hors catégories obligatoires de `CLAUDE.md`. Signatures DFU 10.0.21, Gson 2.14.0, `StrictJsonParser.parse(Reader)` et `FabricLoader.getConfigDir()` lues au `javap`. ⚠️ La borne 999 n'est pas celle du codec d'`ItemStack` (qui s'arrête à 99, §4.1) : c'est un choix du design. |
 | 17/10/2026 | Étape 3 : `SmartChestBlock extends ChestBlock`, `SmartChestBlockEntity extends ChestBlockEntity`, un seul `BlockEntityType` pour tous les bois, bois passé en paramètre (`SmartChestBlocks.register("oak")`), id `oak_smart_chest`. Rien de surchargé côté sauvegarde ni casse : `items`, NBT et `BaseContainerBlockEntity.preRemoveSideEffects` (qui lâche le contenu) sont hérités. Fusion : `ChestBlock.chestCanConnectTo` est `state.is(this)` (identité du bloc) → jamais avec un coffre vanilla, ni avec un autre bois à l'étape 5, sans rien écrire. Seules surcharges : `newBlockEntity` (vanilla y crée un `ChestBlockEntity` en dur) et `getDefaultName` (« Coffre intelligent » ; un double coffre affiche encore « Grand coffre », repris par l'écran de l'étape 6). ⚠️ **`ChestRenderer` choisit sa texture dans un enum fermé** (`ChestRenderState.ChestMaterialType`, `Sheets.chooseSprite`) : pas de branchement possible par données. `SmartChestRenderer` étend `ChestRenderer`, garde son `extractRenderState` (type, orientation, couvercle, lumière du double) et refait seulement `submit` avec `Sheets.CHEST_MAPPER.apply(smartchest:<bois>)` → `smartchest:entity/chest/<bois>[_left\|_right].png`, que l'atlas `chests` ramasse (source `directory`, tous namespaces). Item en main : **données seules**, modèle spécial `minecraft:chest` avec `"texture": "smartchest:oak"`. Textures provisoires par `tools/RecolorChest.java` (bois assombri de 30 %, loquet cuivre). Propriétés du bloc relevées sur `Blocks.CHEST` ; item : `CONTAINER` vide comme `Items.CHEST`, mais 🔷 **pas combustible** (il contient un lingot de cuivre). Onglet « Blocs fonctionnels », après le coffre. `BlockEntityTypes` (pluriel) porte désormais les types vanilla. ⚠️ `runServer` s'arrête sur l'EULA (`run/eula.txt` à `false` dans ce projet, non accepté à la place de Jérôme) : données validées par le serveur intégré de `runClient --quickPlaySingleplayer`, aucune erreur au log. ⚠️ Pour l'étape 7 : `CompoundContainer` ignore `getMaxStackSize(ItemStack)` (§4.1). Validé en jeu par Jérôme (pose, remplissage, double coffre, relance, entonnoir, comparateur, casse, craft). Pas de relecture par sous-agent : ni mixin, ni sauvegarde surchargée, ni réseau, ni arithmétique (le calcul du couvercle est recopié de `ChestRenderer.submit`). |
+| 17/10/2026 | Étape 4 : un seul mixin, `CopperGolemAiMixin`, `@Inject` en `TAIL` du `<clinit>` + `@Shadow @Final @Mutable` sur `TRANSPORT_ITEM_DESTINATION_BLOCK`, enveloppé par `.or(state.is(#smartchest:golem_destinations))` ; tag en données, qui contient `oak_smart_chest`. **Pourquoi cette forme** : une seule ancre (le nom du champ), le test vanilla reste intact et passe en premier, tout lecteur du champ en profite, et un autre mod qui fait de même ajoute simplement un `or`. Écarté : `@ModifyExpressionValue` sur le `getstatic` d'`initIdleActivity` (deux ancres) et `@ModifyReturnValue` sur `lambda$static$1` (nom synthétique). Vérifié au `javap` : le champ n'est lu que par `initIdleActivity()`, via `getActivities()`, appelée par le fournisseur de cerveau de `CopperGolem` à chaque golem, donc après le `<clinit>` ; le constructeur de `TransportItemsBetweenContainers` le copie dans `destinationBlockType`, lu par `isWantedBlock`. Aucune autre identité de bloc dans le comportement : la recherche teste `instanceof ChestBlockEntity`, le double coffre passe par `ChestBlock.TYPE`/`getConnectedBlockPos`/`getContainer`. Règle de dépôt lue en entier (§3) : coffre vide, ou même item déjà présent. Le TagKey est créé dans le handler, sans toucher `SmartChestBlocks` (dont l'initialisation enregistre les blocs). ⚠️ `CopperGolemAi` ne se charge qu'à la création du premier golem : l'export du bytecode (`run/.mixin.out`) est vide tant qu'aucun golem n'existe ; une fois un golem invoqué, il montre le champ sans `final` et le handler juste avant le `return` du `<clinit>`. Validé en jeu par Jérôme (simple et double coffre, plusieurs allers-retours). Relecture Opus : aucun défaut de code ; vérifié aussi que `TransportItemsBetweenContainers` n'est construit que par `CopperGolemAi`, et que les golems rechargés reconstruisent leur cerveau par le même chemin. §3 corrigée : filtres de sélection et filtres en route séparés, chat assis, liste des visitées, double coffre. Signalé et documenté sans correctif : un coffre de cuivre ajouté au tag par datapack ferait reposer sur place ; un bloc sans `ChestBlockEntity` dans le tag est ignoré. |
