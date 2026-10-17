@@ -1,0 +1,23 @@
+{
+	"schemaVersion": 1,
+	"id": "smartchest",
+	"version": "${version}",
+	"name": "Smart Chest",
+	"description": "A chest with upgrade slots: higher stack capacity and automatic compression into blocks. Copper golems can use it.",
+	"authors": [
+		"Jerome"
+	],
+	"license": "MIT",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"re.jerome.smartchest.SmartChestMod"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

@@ -1,0 +1,27 @@
+# Gradle
+.gradle/
+build/
+out/
+classes/
+
+# Fabric Loom
+run/
+remappedSrc/
+*.log
+
+# Local references
+ref/
+Craft upgrade*.png
+
+# IDE
+.idea/
+*.iml
+.vscode/
+bin/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code (local, per-machine)
+.claude/settings.local.json
