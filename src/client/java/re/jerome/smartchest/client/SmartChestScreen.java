@@ -13,8 +13,8 @@ import net.minecraft.world.item.ItemStack;
 import re.jerome.smartchest.SmartChestMenu;
 import re.jerome.smartchest.SmartChestMod;
 
-// The vanilla chest screen (ContainerScreen), with a panel of upgrade slots on the
-// right, beside rows 1-2. The texture, made by tools/GenerateUpgrades.java, is
+// The vanilla chest screen (ContainerScreen), with a panel of five upgrade slots on
+// the right, from the first row down. The texture, made by tools/GenerateUpgrades.java, is
 // generic_54.png with that panel. The panel is inside imageWidth, so that a click
 // on it is not a click outside.
 public class SmartChestScreen extends AbstractContainerScreen<SmartChestMenu> {
@@ -23,7 +23,10 @@ public class SmartChestScreen extends AbstractContainerScreen<SmartChestMenu> {
 	private static final int PANEL_X = 178;
 	private static final int PANEL_WIDTH = 32;
 	private static final int PANEL_TOP = 10;
-	private static final int PANEL_HEIGHT = 50;
+	private static final int PANEL_HEIGHT = 108;
+	private static final List<Component> FORCED_HINT = List.of(
+			Component.translatable("container.smartchest.forced_compression"),
+			Component.translatable("container.smartchest.forced_compression.hint").withStyle(ChatFormatting.GRAY));
 
 	private final int rows;
 
@@ -41,6 +44,16 @@ public class SmartChestScreen extends AbstractContainerScreen<SmartChestMenu> {
 			lines.add(Component.translatable("container.smartchest.capacity_locked").withStyle(ChatFormatting.RED));
 		}
 		return lines;
+	}
+
+	@Override
+	protected void extractTooltip(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+		super.extractTooltip(graphics, mouseX, mouseY);
+		// What an empty forced compression slot is for (SPEC §5.1), as the smithing
+		// table explains its empty slots.
+		if (hoveredSlot != null && !hoveredSlot.hasItem() && menu.getCarried().isEmpty() && menu.isForced(hoveredSlot)) {
+			graphics.setComponentTooltipForNextFrame(font, FORCED_HINT, mouseX, mouseY);
+		}
 	}
 
 	@Override

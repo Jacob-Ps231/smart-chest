@@ -15,9 +15,10 @@ import javax.imageio.ImageIO;
 
 /**
  * Generates the files of the upgrades (SPEC §4, step 6): for each capacity upgrade,
- * its item, item model, recipe and sprite; the two empty upgrade slot icons; and the
- * chest screen background, generic_54.png with the upgrade panel. Then reads
- * everything back. Names and translations are in the language files, by hand.
+ * its item, item model, recipe and sprite; the empty slot icons of the capacity,
+ * crafter and forced compression (step 8b) slots; and the chest screen background,
+ * generic_54.png with the upgrade panel. Then reads everything back. Names and
+ * translations are in the language files, by hand.
  *
  * The sprites are placeholders: replace the method sprite() to draw others.
  *
@@ -41,10 +42,11 @@ public class GenerateUpgrades {
 	static final String VANILLA = "assets/minecraft/textures/";
 
 	// Screen layout, shared with SmartChestScreen and SmartChestMenu: a panel 32 wide
-	// at x 178, two slots tall, beside rows 1-2.
+	// at x 178, five slots tall: capacity, crafter, then 4 pixels lower the three
+	// forced compressions (SPEC §5.1).
 	static final int PANEL_X = 178;
 	static final int PANEL_WIDTH = 32;
-	static final int PANEL_HEIGHT = 50;
+	static final int PANEL_HEIGHT = 108;
 	static final int PANEL_Y = 10;
 
 	static final Map<Path, byte[]> written = new LinkedHashMap<>();
@@ -63,6 +65,7 @@ public class GenerateUpgrades {
 			}
 			writeImage(ASSETS.resolve("textures/gui/sprites/container/slot/capacity_upgrade.png"), capacityIcon());
 			writeImage(ASSETS.resolve("textures/gui/sprites/container/slot/compression_upgrade.png"), compressionIcon());
+			writeImage(ASSETS.resolve("textures/gui/sprites/container/slot/forced_compression.png"), forcedIcon());
 			writeImage(ASSETS.resolve("textures/gui/container/smart_chest.png"),
 					background(read(jar, VANILLA + "gui/container/generic_54.png")));
 		}
@@ -154,6 +157,24 @@ public class GenerateUpgrades {
 		return image;
 	}
 
+	/** An arrow pointing down onto a block: forced into a block. */
+	static BufferedImage forcedIcon() {
+		BufferedImage image = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+		// Shaft, then the head narrowing to its point at y 7.
+		int[][] arrow = {{7, 8}, {7, 8}, {7, 8}, {4, 11}, {5, 10}, {6, 9}, {7, 8}};
+		for (int row = 0; row < arrow.length; row++) {
+			for (int x = arrow[row][0]; x <= arrow[row][1]; x++) {
+				image.setRGB(x, 1 + row, ICON);
+			}
+		}
+		for (int y = 10; y <= 14; y++) {
+			for (int x = 3; x <= 12; x++) {
+				image.setRGB(x, y, ICON);
+			}
+		}
+		return image;
+	}
+
 	/** Darkest, middle and lightest colours of a texture, by brightness, transparent pixels left out. */
 	static int[] palette(BufferedImage texture) {
 		List<Integer> colours = new ArrayList<>();
@@ -184,9 +205,9 @@ public class GenerateUpgrades {
 		BufferedImage image = new BufferedImage(256, 256, BufferedImage.TYPE_INT_ARGB);
 		copy(vanilla, 0, 0, image, 0, 0, 176, 222);
 		panel(vanilla, image, PANEL_X, PANEL_Y);
-		for (int slot = 0; slot < 2; slot++) {
+		for (int slot = 0; slot < 5; slot++) {
 			// SmartChestMenu.UPGRADE_X is the item, one pixel inside the slot.
-			copy(vanilla, 7, 17, image, PANEL_X + 7, PANEL_Y + 7 + 18 * slot, 18, 18);
+			copy(vanilla, 7, 17, image, PANEL_X + 7, PANEL_Y + 7 + 18 * slot + (slot >= 2 ? 4 : 0), 18, 18);
 		}
 		return image;
 	}
@@ -276,7 +297,7 @@ public class GenerateUpgrades {
 				}
 			}
 		}
-		int expected = UPGRADES.size() * 4 + 3;
+		int expected = UPGRADES.size() * 4 + 4;
 		if (written.size() != expected) {
 			errors.add(written.size() + " files written, " + expected + " expected");
 		}

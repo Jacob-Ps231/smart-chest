@@ -13,6 +13,8 @@
   "block.smartchest.warped_smart_chest": "Coffre intelligent biscornu",
   "container.smartchest.capacity_locked": "Impossible de la retirer : un emplacement dépasse le plafond sans elle",
   "container.smartchest.double_smart_chest": "Grand coffre intelligent",
+  "container.smartchest.forced_compression": "Compression forcée",
+  "container.smartchest.forced_compression.hint": "Posez un objet sans recette inverse (quartz, melon…). Crafter requis.",
   "container.smartchest.smart_chest": "Coffre intelligent",
   "item.smartchest.capacity_upgrade_128": "Amélioration de capacité (128)",
   "item.smartchest.capacity_upgrade_256": "Amélioration de capacité (256)",

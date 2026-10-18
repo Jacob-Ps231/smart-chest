@@ -37,7 +37,11 @@ import net.minecraft.world.phys.Vec3;
 public class SmartChestBlockEntity extends ChestBlockEntity {
 	public static final int CAPACITY_SLOT = 0;
 	public static final int COMPRESSION_SLOT = 1;
-	private static final String[] UPGRADE_KEYS = {"capacity_upgrade", "compression_upgrade"};
+	/** The forced compression slots (SPEC §5.1), from here to the last upgrade slot. */
+	public static final int FIRST_FORCED_SLOT = 2;
+	private static final String[] UPGRADE_KEYS = {"capacity_upgrade", "compression_upgrade",
+		"forced_compression_1", "forced_compression_2", "forced_compression_3"};
+	public static final int UPGRADE_SLOTS = UPGRADE_KEYS.length;
 	/** Items the capacity upgrade leaves at their vanilla stack (SPEC §4): shulker boxes, bundles, written books. */
 	public static final TagKey<Item> NO_CAPACITY_UPGRADE = TagKey.create(Registries.ITEM, SmartChestMod.id("no_capacity_upgrade"));
 	// The count field of ItemStack.CODEC stops here (SPEC §4.1).
@@ -46,7 +50,7 @@ public class SmartChestBlockEntity extends ChestBlockEntity {
 
 	// Apart from the inherited items, which are all the golem and hoppers see
 	// (SPEC §2.2): only the screen shows these, the comparator reads the capacity
-	// upgrade's caps, and the compression looks for the crafter.
+	// upgrade's caps, and the compression looks for the crafter and the forced items.
 	private final SimpleContainer upgrades = new SimpleContainer(UPGRADE_KEYS.length) {
 		@Override
 		public void setChanged() {
@@ -63,9 +67,17 @@ public class SmartChestBlockEntity extends ChestBlockEntity {
 		super(SmartChestBlocks.BLOCK_ENTITY, pos, state);
 	}
 
-	/** Whether the upgrade slot {@code slot} takes this item. Read on both sides, by the menu's slots. */
-	public static boolean acceptsUpgrade(int slot, ItemStack stack) {
-		return slot == CAPACITY_SLOT ? SmartChestItems.isCapacityUpgrade(stack) : SmartChestItems.isCompressionUpgrade(stack);
+	/**
+	 * Whether the upgrade slot {@code slot} takes this item. Read on both sides, by
+	 * the menu's slots; the client, which has no recipes, takes anything into a
+	 * forced compression slot and lets the server decide.
+	 */
+	public static boolean acceptsUpgrade(int slot, ItemStack stack, boolean client) {
+		return switch (slot) {
+			case CAPACITY_SLOT -> SmartChestItems.isCapacityUpgrade(stack);
+			case COMPRESSION_SLOT -> SmartChestItems.isCompressionUpgrade(stack);
+			default -> client || SmartChestCompression.canForce(stack);
+		};
 	}
 
 	/**

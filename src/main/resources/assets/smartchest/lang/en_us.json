@@ -13,6 +13,8 @@
   "block.smartchest.warped_smart_chest": "Warped Smart Chest",
   "container.smartchest.capacity_locked": "Can't be taken out: a slot holds more than the cap without it",
   "container.smartchest.double_smart_chest": "Large Smart Chest",
+  "container.smartchest.forced_compression": "Forced compression",
+  "container.smartchest.forced_compression.hint": "Place an item with no reverse recipe (quartz, melon…). Needs the crafter.",
   "container.smartchest.smart_chest": "Smart Chest",
   "item.smartchest.capacity_upgrade_128": "Capacity Upgrade (128)",
   "item.smartchest.capacity_upgrade_256": "Capacity Upgrade (256)",

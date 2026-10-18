@@ -15,8 +15,9 @@ import net.minecraft.world.item.ItemStack;
 // A ChestMenu so that the chest counts its viewer: ChestBlockEntity's opener counter
 // only recognises a ChestMenu over its own container, and closes the lid on anyone
 // else. Slots, in order: the chest's rows, the player's inventory (both from
-// ChestMenu), then the two upgrades -- of the first half for a double chest, the
-// only ones it has once merged (SPEC §2.1).
+// ChestMenu), then the five upgrade slots -- capacity, crafter, three forced
+// compressions -- of the first half for a double chest, the only ones it has once
+// merged (SPEC §2.1).
 //
 // The capacity caps live in the chest slots (SPEC §4.1), on both sides: the client
 // reads the capacity upgrade from its copy of the upgrade slot, which the server keeps
@@ -27,11 +28,15 @@ public class SmartChestMenu extends ChestMenu {
 	// Drawn by tools/GenerateUpgrades.java, in the gui atlas.
 	private static final Identifier CAPACITY_ICON = SmartChestMod.id("container/slot/capacity_upgrade");
 	private static final Identifier COMPRESSION_ICON = SmartChestMod.id("container/slot/compression_upgrade");
+	private static final Identifier FORCED_ICON = SmartChestMod.id("container/slot/forced_compression");
 
 	private final Container upgrades;
 	private final int chestEnd;
 	private final int upgradesStart;
-	// The click being handled, for the capacity slot's mayPickup (see there).
+	// The client has no recipes: its forced compression slots take anything (SmartChestBlockEntity.acceptsUpgrade).
+	private final boolean client;
+	// The click being handled, for the capacity slot's mayPickup and the forced
+	// slots' mayPlace (see there).
 	private ContainerInput input;
 
 	private SmartChestMenu(MenuType<?> type, int containerId, Inventory inventory, Container chest, int rows,
@@ -47,11 +52,21 @@ public class SmartChestMenu extends ChestMenu {
 			capped.index = index;
 			slots.set(index, capped);
 		}
+		client = inventory.player.level().isClientSide();
 		upgradesStart = slots.size();
-		// Beside the first two rows.
-		for (int slot = 0; slot < 2; slot++) {
-			addSlot(new UpgradeSlot(upgrades, slot, 18 + 18 * slot));
+		// One column beside the rows, the forced slots 4 pixels below the crafter.
+		for (int slot = 0; slot < SmartChestBlockEntity.UPGRADE_SLOTS; slot++) {
+			addSlot(new UpgradeSlot(upgrades, slot, 18 + 18 * slot + (isForced(slot) ? 4 : 0)));
 		}
+	}
+
+	private static boolean isForced(int upgradeSlot) {
+		return upgradeSlot >= SmartChestBlockEntity.FIRST_FORCED_SLOT;
+	}
+
+	/** Whether this is a forced compression slot (SPEC §5.1). */
+	public boolean isForced(Slot slot) {
+		return slot instanceof UpgradeSlot && isForced(slot.getContainerSlot());
 	}
 
 	/** Server side, a single chest. */
@@ -66,11 +81,11 @@ public class SmartChestMenu extends ChestMenu {
 
 	/** Client side: empty containers, which the server fills. */
 	public static SmartChestMenu single(int containerId, Inventory inventory) {
-		return single(containerId, inventory, mirror(27), new SimpleContainer(2));
+		return single(containerId, inventory, mirror(27), new SimpleContainer(SmartChestBlockEntity.UPGRADE_SLOTS));
 	}
 
 	public static SmartChestMenu twoHalves(int containerId, Inventory inventory) {
-		return twoHalves(containerId, inventory, mirror(54), new SimpleContainer(2));
+		return twoHalves(containerId, inventory, mirror(54), new SimpleContainer(SmartChestBlockEntity.UPGRADE_SLOTS));
 	}
 
 	/**
@@ -161,6 +176,12 @@ public class SmartChestMenu extends ChestMenu {
 			return false;
 		}
 		return true;
+	}
+
+	@Override
+	public boolean canTakeItemForPickAll(ItemStack carried, Slot slot) {
+		// A double-click on melon slices would take the slice that forces them.
+		return !isForced(slot) && super.canTakeItemForPickAll(carried, slot);
 	}
 
 	@Override
@@ -263,7 +284,15 @@ public class SmartChestMenu extends ChestMenu {
 
 		@Override
 		public boolean mayPlace(ItemStack stack) {
-			return SmartChestBlockEntity.acceptsUpgrade(getContainerSlot(), stack);
+			// A forced slot takes only a direct click (SPEC §5.1). Shift-click
+			// (QUICK_MOVE), keys 1-9 and F (SWAP) and dragging (QUICK_CRAFT) all ask
+			// here inside clicked; the screen asks for its drag outside of it (null).
+			// A click that moves the mouse within the slot comes as a PICKUP, since
+			// the screen never added the slot to the drag.
+			if (isForced(getContainerSlot()) && input != ContainerInput.PICKUP) {
+				return false;
+			}
+			return SmartChestBlockEntity.acceptsUpgrade(getContainerSlot(), stack, client);
 		}
 
 		@Override
@@ -284,7 +313,11 @@ public class SmartChestMenu extends ChestMenu {
 
 		@Override
 		public Identifier getNoItemIcon() {
-			return getContainerSlot() == SmartChestBlockEntity.CAPACITY_SLOT ? CAPACITY_ICON : COMPRESSION_ICON;
+			return switch (getContainerSlot()) {
+				case SmartChestBlockEntity.CAPACITY_SLOT -> CAPACITY_ICON;
+				case SmartChestBlockEntity.COMPRESSION_SLOT -> COMPRESSION_ICON;
+				default -> FORCED_ICON;
+			};
 		}
 	}
 }

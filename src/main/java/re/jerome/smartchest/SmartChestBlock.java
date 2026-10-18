@@ -1,6 +1,8 @@
 package re.jerome.smartchest;
 
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -13,6 +15,7 @@ import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.ChestBlock;
@@ -138,7 +141,14 @@ public class SmartChestBlock extends ChestBlock {
 	private static void compress(Container chest, SmartChestBlockEntity first) {
 		if (SmartChestConfig.get().compression().enabled()
 				&& SmartChestItems.isCompressionUpgrade(first.upgrades().getItem(SmartChestBlockEntity.COMPRESSION_SLOT))) {
-			SmartChestCompression.compress(chest, capacityUpgrade(first));
+			Set<Item> forced = new HashSet<>();
+			for (int slot = SmartChestBlockEntity.FIRST_FORCED_SLOT; slot < SmartChestBlockEntity.UPGRADE_SLOTS; slot++) {
+				ItemStack stack = first.upgrades().getItem(slot);
+				if (!stack.isEmpty()) {
+					forced.add(stack.getItem());
+				}
+			}
+			SmartChestCompression.compress(chest, capacityUpgrade(first), forced);
 		}
 		first.compressionPending = false;
 	}

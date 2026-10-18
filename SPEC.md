@@ -5,7 +5,7 @@ Les instructions de travail permanentes sont dans `CLAUDE.md`, les pièges de la
 machine et de Minecraft 26.3 dans `../SETUP-MC-MODDING-26.3.md` (et §1 et §4 de
 `../SETUP-MC-MODDING-26.2.md`).
 
-Statut : étapes 1 à 8 faites. Prochaine session : étape 9 (release).
+Statut : étapes 1 à 8b faites. Prochaine session : étape 9 (release).
 Dernière mise à jour : 18/10/2026.
 
 Conventions de ce fichier :
@@ -38,7 +38,7 @@ pas de recette inverse, tout objet à durabilité.
 | Propriété | Valeur | Statut |
 | --- | --- | --- |
 | Inventaire | 27 emplacements, comme un coffre | ✅ |
-| Emplacements d'amélioration | 2 : un pour la capacité, un pour la compression | ✅ |
+| Emplacements d'amélioration | 2 : un pour la capacité, un pour la compression ; plus 3 de compression forcée (§5.1, étape 8b) | ✅ |
 | Double coffre | oui, fusion comme en vanilla | ✅ |
 | Entonnoirs | insertion et extraction | ✅ |
 | Comparateur | signal selon le remplissage | ✅ |
@@ -62,7 +62,7 @@ sauvegardé à part. Sinon le golem, les entonnoirs et le comparateur les
 verraient comme des emplacements de stockage et y rangeraient des objets.
 Les améliorations sont rendues par l'écran seulement, et lâchées à la casse.
 
-Implémenté à l'étape 6 : un `SimpleContainer` de 2 emplacements dans `SmartChestBlockEntity` (0 capacité, 1 compression), dont `setChanged` remonte au block entity ; sauvegardé sous les clés `capacity_upgrade` et `compression_upgrade` (`ItemStack.OPTIONAL_CODEC`, une pièce par emplacement, donc sans le piège des 99) ; lâché par `preRemoveSideEffects` après le contenu. Chaque moitié d'un double coffre a les siens et les lâche à sa casse ; à la fusion, `SmartChestBlockEntity.setBlockState` réunit ceux de la moitié secondaire dans la principale (§2.1) : `LevelChunk.setBlockState` l'appelle quand le bloc reste le même mais change d'état, et le coffre déjà posé passe de `SINGLE` à `LEFT`/`RIGHT` par `updateShape`, une fois le nouveau coffre et son block entity en place — quel que soit l'ordre de pose, serveur seulement. Éjection par `Block.popResourceFromFace` (face `FACING`). Emplacement capacité : les 4 items `SmartChestItems.CAPACITY_UPGRADES` ; compression : `minecraft:crafter` ; une seule pièce par emplacement (`Slot.getMaxStackSize`).
+Implémenté à l'étape 6 : un `SimpleContainer` de 2 emplacements dans `SmartChestBlockEntity` (0 capacité, 1 compression), dont `setChanged` remonte au block entity ; sauvegardé sous les clés `capacity_upgrade` et `compression_upgrade` (`ItemStack.OPTIONAL_CODEC`, une pièce par emplacement, donc sans le piège des 99) ; lâché par `preRemoveSideEffects` après le contenu. Chaque moitié d'un double coffre a les siens et les lâche à sa casse ; à la fusion, `SmartChestBlockEntity.setBlockState` réunit ceux de la moitié secondaire dans la principale (§2.1) : `LevelChunk.setBlockState` l'appelle quand le bloc reste le même mais change d'état, et le coffre déjà posé passe de `SINGLE` à `LEFT`/`RIGHT` par `updateShape`, une fois le nouveau coffre et son block entity en place — quel que soit l'ordre de pose, serveur seulement. Éjection par `Containers.dropItemStack` devant la face `FACING` (§2.1). Emplacement capacité : les 4 items `SmartChestItems.CAPACITY_UPGRADES` ; compression : `minecraft:crafter` ; une seule pièce par emplacement (`Slot.getMaxStackSize`). Étape 8b : 5 emplacements, les 3 derniers de compression forcée (§5.1).
 
 ---
 
@@ -250,6 +250,103 @@ perte) : `k` baisse jusqu'à ce que les blocs tiennent (place des piles de blocs
 
 Implémenté à l'étape : 8.
 
+### 5.1 Compression forcée ✅ (18/10/2026, demande de Jérôme)
+
+Beaucoup d'objets sont écartés faute de recette inverse : quartz, améthyste,
+glowstone, neige, argile, rayon de miel, bambou, melon… **Trois emplacements de
+compression forcée**, dans le panneau des améliorations, sous le crafter, lèvent
+cette condition pour les objets qu'on y pose.
+
+- **Objet réel, un seul par emplacement** ✅ (comme le crafter : on pose une
+  tranche de melon, elle y reste, on peut la reprendre). Pas de fantôme.
+- N'accepte qu'un objet qui a une recette de compression **hormis l'inverse**
+  (un seul ingrédient sans reste de craft, répété en grille 2×2 ou 3×3 pleine ou sans forme de 4 ou 9, une sortie sans durabilité) et que la table normale ne compresse pas déjà.
+  Les autres règles de §5 restent : seuil `S`, total du coffre, cascade, rien
+  retiré si le bloc ne tient pas.
+- **Crafter requis** ✅ : sans crafter dans l'emplacement de compression, rien
+  n'est compressé, forcé ou non.
+- **Entrée par clic direct seulement** ✅ : ni shift-clic, ni touches 1–9 (SWAP),
+  ni glisser ne remplissent ces emplacements. Golem et entonnoirs ne les voient
+  pas (hors de `items`, §2.2).
+- ✅ Le tag `#smartchest:no_compression` l'emporte (choix du modpack).
+- ✅ Double coffre : sur la moitié principale, réunis ou éjectés à la fusion
+  comme les autres améliorations (§2.1) ; lâchés à la casse ; sauvegardés.
+- La compression forcée est irréversible ; poser du sable fait du grès, poser
+  de la ficelle de la laine blanche : c'est le choix du joueur. ⚠️ L'idée
+  « poser des planches force les établis » était fausse : l'établi prend le tag
+  `#planks`, ce n'est jamais une recette d'un seul objet.
+
+Choix du plan de l'étape 8b ✅ (Jérôme, 18/10/2026) :
+
+- **Grille pleine seulement** ✅ (ajouté après le premier lancement, validé en jeu par Jérôme) :
+  sans la condition d'inverse, le filtre de l'étape 8 laissait passer 128
+  règles, dont planches ×5 → bateau, cuir ×8 → plastron, écaille de tortue ×5 →
+  casque, dalles ×2 → blocs ciselés, pierre ×2 → plaque de pression. La table
+  forcée ne garde qu'une grille **2×2 ou 3×3 pleine** (`ShapedRecipe.getWidth()
+  == getHeight()`, `largeur × hauteur = N`) ou une recette sans forme de **4 ou
+  9**, et jamais un résultat à durabilité.
+- **Seulement ce que la table normale ne fait pas** (relecture de l'étape 8b) :
+  un objet de la table normale (émeraude, pépite de fer, carotte de Crate
+  Delight) est refusé par l'emplacement forcé, où il n'aurait rien changé.
+  Vanilla 26.3 : **24 règles** (la table normale en a 48 avec Crate Delight),
+  aucune ambiguïté : améthyste, quartz, glowstone, neige, argile, rayon de
+  miel, bambou, melon, verrue du Nether, glace → glace compactée → glace bleue,
+  briques, briques du Nether, briques de résine, sable, sable rouge, ficelle,
+  peau de lapin, fragments de disque, cristaux de prismarine, crème de magma,
+  stalactite, soufre.
+- **Plusieurs recettes pour un objet forcé : le plus grand `N`** (puis la
+  première trouvée ; une égalité sur le `N` retenu est loguée) : le cristal de
+  prismarine donne les briques (9) et non la prismarine (4) ; le tag tranche.
+- **Ingrédient à reste de craft exclu** (`Item.getCraftingRemainder() != null`),
+  des deux tables : sinon 4 fioles de miel → un bloc de miel détruiraient les
+  4 fioles vides. Sans effet sur la table normale vanilla.
+- **Par objet** : une tranche de melon renommée posée force les tranches sans
+  composant. Une cascade forcée demande un emplacement par étage (glace, puis
+  glace compactée pour la glace bleue). Doublons permis.
+- **Le client n'a pas les recettes** (`ClientboundUpdateRecipesPacket` ne porte
+  que les `RecipePropertySet` et le tailleur de pierre) : son emplacement forcé
+  accepte tout objet, le serveur seul juge ; un objet refusé revient au curseur
+  (correction de prédiction vanilla, sans perte). Pas de paquet réseau maison.
+- **Double-clic** : il ne ramasse jamais dans un emplacement forcé
+  (`canTakeItemForPickAll`), sinon un double-clic sur des tranches de melon
+  emporterait celle qui les force.
+- **Infobulle** sur un emplacement forcé vide (« Compression forcée », et à
+  quoi il sert), comme la table de forge sur ses emplacements vides.
+
+**Implémentation (étape 8b)** :
+
+- **Gestes** (relevé au `javap`, `AbstractContainerMenu.doClick` et
+  `AbstractContainerScreen.mouseClicked/mouseDragged/mouseReleased`) : PICKUP,
+  SWAP, QUICK_CRAFT et `moveItemStackTo` (shift-clic) testent tous
+  `Slot.mayPlace` à l'intérieur de `clicked`, que le client rejoue pour sa
+  prédiction. Le menu garde le geste en cours (champ `input`, posé par
+  `clicked`) : un emplacement forcé n'accepte que si c'est un PICKUP. L'écran
+  ajoute un emplacement à un glisser par `mouseDragged` (`mayPlace` et
+  `canDragTo`, hors de `clicked` : `input` nul, refusé) ; au relâchement, un
+  glisser vide part en PICKUP ordinaire, donc un clic qui bouge un peu la
+  souris dans l'emplacement passe. ⚠️ Un glisser sur un seul emplacement part
+  en QUICK_CRAFT, que `doClick` convertit en PICKUP **interne**, sans repasser
+  par `clicked` : refusé ici, mais l'écran vanilla ne l'envoie jamais pour un
+  emplacement forcé. Sortir l'objet reste libre (clic, shift-clic, touche vers
+  une case vide, Q). Un sac tenu au curseur peut y déposer un objet par clic
+  droit (`BundleItem` → `Slot.safeInsert`) : c'est un PICKUP, accepté si
+  l'objet est forçable, sinon il reste dans le sac.
+- **Tables** : `SmartChestCompression.rebuild` construit les deux en une
+  passe (`isFullGrid` pour la forcée) ; log `Forced compression table: … rules:
+  …` après celui de la table normale. `canForce` (serveur) pour `mayPlace`.
+  `compress(coffre, capacité, objets forcés)` : règle normale, sinon règle
+  forcée si l'objet est dans un emplacement forcé de la moitié principale.
+- **Conteneur d'améliorations** à 5 emplacements : 0 capacité, 1 crafter, 2 à 4
+  forcés (`FIRST_FORCED_SLOT`), clés `forced_compression_1` à `_3`
+  (`ItemStack.OPTIONAL_CODEC`) ; un coffre de l'étape 8 se charge tel quel (clé
+  absente : vide). Fusion, éjection, casse et copie créative passent par les
+  boucles de l'étape 6 sur toutes les clés.
+- **Écran** : même colonne, forcés 4 px sous le crafter (y 58, 76, 94),
+  panneau 32 × 108. Icône d'emplacement vide : une flèche vers le bas sur un
+  bloc (`forced_compression.png`, `tools/GenerateUpgrades.java`).
+
+Implémenté à l'étape : 8b.
+
 ---
 
 ## 6. Configuration 🔷
@@ -327,7 +424,7 @@ Gradle `9.6.0`, JDK `25`, aucune mappings. Loom **1.17**, pas 1.18.
   « Grand coffre intelligent »).
 - **Écran** : `SmartChestScreen`, dessiné comme `ContainerScreen`, plus un panneau
   de 2 emplacements à droite (x 178, 32 × 50) à côté des rangées 1-2, simple ou
-  double. `imageWidth` = 210 pour que
+  double ; 5 emplacements et 32 × 108 depuis l'étape 8b (§5.1). `imageWidth` = 210 pour que
   le panneau compte comme l'intérieur de l'écran. Fond, sprites et icônes
   d'emplacement vide par `tools/GenerateUpgrades.java` (méthode `sprite` à
   remplacer pour un autre dessin) ; il écrit aussi item, modèle et recette des 4
@@ -440,6 +537,7 @@ obligatoires de `CLAUDE.md`.
 | 6 | Emplacements d'amélioration | conteneur à part, `MenuType`, écran, `Slot` maison, NBT, lâchés à la casse ; les 4 items de capacité (recettes, sprites provisoires, sans effet) | l'écran montre 27 + 2 emplacements ; un objet y reste après relance ; golem et entonnoir ne s'y servent pas ; double coffre : seuls ceux de la moitié principale, réunis à la fusion ; casser lâche tout | ✅ faite |
 | 7 | Amélioration de capacité | 4 items, plafonds, sauvegarde du compteur hors codec, réseau, entonnoir, comparateur | 999 potions dans un emplacement, relance du monde, tout est là ; retirer l'amélioration refusé si dépassement | ✅ faite |
 | 8 | Compression | table de recettes, drapeau + tick programmé, cascade, `no_compression` | 64 émeraudes + 1 → un bloc ; quartz ne bouge jamais ; plein → rien n'est perdu | ✅ faite |
+| 8b | Compression forcée | 3 emplacements d'objet (§5.1), entrée par clic direct seulement, crafter requis, fusion et casse du double coffre | une tranche de melon posée : au-delà du plafond, 9 tranches → un melon ; quartz posé → bloc de quartz ; shift-clic et touches 1–9 n'y mettent rien ; sans crafter, rien ; relance du monde | ✅ faite |
 | 9 | Release | README (page Modrinth), version, tag, jar dans `_Publiés/` | feu vert de Jérôme | |
 
 Le « Validé quand » est ce que Jérôme joue avant toute relecture et tout
@@ -482,3 +580,4 @@ réseau, arithmétique), 8 (arithmétique, persistance).
 | 17/10/2026 | Étape 6 : emplacements d'amélioration et les 4 items de capacité (sans effet). Conteneur à part dans le block entity (§2.2), `SmartChestMenu extends ChestMenu`, deux `MenuType` simples, `SmartChestScreen` avec un panneau à droite (§7.3). ⚠️ **Ce qui s'est révélé faux** : la moitié principale n'est pas `ChestType.LEFT` mais `RIGHT` — c'est elle que `ChestBlock.getBlockType` nomme `FIRST` et que le `CompoundContainer` met en premier (§2.1) ; l'intention de la spec (première du conteneur, à gauche vue de face) tenait, seul le nom d'enum était faux. ⚠️ **Un menu de coffre qui n'est pas un `ChestMenu` referme le couvercle** : `ChestBlockEntity$1.isOwnContainer` teste `instanceof ChestMenu` puis `getContainer() == this` ou `CompoundContainer.contains(this)`, d'où l'héritage. ⚠️ `MenuType(MenuSupplier, FeatureFlagSet)` et `MenuScreens.register` sont **privés** en 26.3 : Fabric les ouvre par ses access wideners transitifs ; l'ancien `ExtendedScreenHandlerType` est devenu `ExtendedMenuType`, inutile ici. Vérifié au `javap` : `moveItemStackTo` respecte `Slot.mayPlace` et `Slot.getMaxStackSize(ItemStack)` (= `min(getMaxStackSize(), pile)`), `BlockEntity.preRemoveSideEffects` ne lâche que le `Container` du block entity, `ChestBlockEntity.swapContents` ne sert qu'à la mise à niveau des vieux mondes. Compression : `Items.CRAFTER` directement (spec ✅ : le crafter seul), pas de tag. Onglet créatif : les 4 améliorations après les coffres. Recettes par script (même grille, centre fer / or / diamant / fragment de netherite). Données chargées sans erreur par le serveur intégré ; `runServer` s'arrête toujours sur l'EULA, après l'initialisation du mod. Premier essai de Jérôme : tout validé (écran, relance, golem, entonnoir, casse, moitié principale), puis changement demandé : un seul panneau sur le double coffre, et réunion des améliorations à la fusion (§2.1) — panneau grisé et seconde paire d'emplacements retirés. Second essai (fusion, deux sens de pose, emplacement libre ou occupé, séparation) : validé par Jérôme, rien de perdu. **Relecture Opus** (persistance, réseau du menu, fusion) : shift-clic, autres clics, indices du menu, casse, chargement, désynchro, signatures : rien à signaler. Corrigé : l'amélioration éjectée était perdue avec `blockDrops` à false (`popResourceFromFace` → `Containers.dropItemStack` devant la face) ; une copie créative emportait les améliorations et les rechargeait après la fusion, en écrasant la moitié principale (`removeComponentsFromTag` les retire) ; la fusion pouvait charger un chunk de façon synchrone et ne vérifiait pas le partenaire (`isLoaded`, même bloc, type opposé). Accepté et noté en §2.1 : le menu simple d'une moitié devenue secondaire. Pour l'étape 8 : un shift-clic sur une pile de crafters en met un dans l'emplacement de compression. Essai des correctifs validé par Jérôme ; il a relevé que deux coffres posés côte à côte ne fusionnent pas après coup, ce qui rend l'éjection inaccessible en jeu normal (§2.1). Pas de second tour de relecture : les correctifs sont ceux que la relecture proposait, signatures lues au `javap` (`Containers.dropItemStack`, `ValueOutput.discard`, `Level.isLoaded`, `Vec3.relative`, `ChestType.getOpposite`). |
 | 17/10/2026 | Étape 7 : effet de l'amélioration de capacité (§4.1, « Implémentation »). Choix de Jérôme au plan : entonnoirs et golem au **stack vanilla** par emplacement, sans mixin ; casse par la **découpe vanilla** de 10 à 30 objets par entité (des piles strictement vanilla feraient 27 000 entités de potions). Points ouverts de §7.4 relevés au `javap` : entonnoir et golem lisent `ItemStack.getMaxStackSize()` ; le comparateur divise par `Container.getMaxStackSize(ItemStack)` et `lerpDiscrete` n'est pas borné ; `OPTIONAL_STREAM_CODEC` écrit un `VarInt` libre. ⚠️ **Ce qui s'est révélé faux** : « contourner `CompoundContainer` avant d'écrire l'étape 7 » — inutile, le plafond vit dans les emplacements du menu et dans le comparateur, et l'automatisation reste au stack vanilla ; « réseau » au plan — rien à faire ; la spec ignorait que **`setItem` tronque** (`BaseContainerBlockEntity` et `SimpleContainer` : `limitSize`), que `moveItemStackTo` ne fusionne pas les objets non empilables, et que PICKUP (échange), SWAP et Ctrl+Q sortent la pile entière ; §2.1 disait « vanilla n'emporte pas le contenu » dans une copie créative — il l'emporte, dans le composant `CONTAINER`. Validé en jeu par Jérôme (999 potions, relance, retrait refusé avec infobulle, entonnoir, comparateur, double coffre, golem, casse) ; il note que le comparateur monte plus vite avec un palier bas (remplissage rapporté au plafond), ce qui lui va. **Relecture Opus** (persistance, réseau, arithmétique) : aucune duplication ni perte en survie ; sauvegarde sur le thread serveur (`ChunkMap.save` → `SerializableChunkData.copyOf`, seul `write` est asynchrone), donc le retrait temporaire des grandes piles est sûr ; slots remplacés en place cohérents avec `lastSlots`/`remoteSlots`. Corrigé : Ctrl+Q bouclait (999 entités) ; la copie créative perdait les grandes piles (`ItemStackTemplate.validate`), elle reçoit désormais un stack vanilla de chacune ; le comparateur de la moitié secondaire n'était pas prévenu d'un changement d'amélioration ; `large_items` était lu et écrit malgré une table de loot en attente ; un SWAP pendant un glisser ne l'annulait pas ; commentaires périmés. Documenté sans correctif : la config n'est pas synchronisée (paliers identiques requis en multijoueur, §6) ; en multijoueur, un glisser sur un seul emplacement qu'un autre joueur remplit entre-temps peut mettre plus d'un stack sur le curseur (`doClick` interne, sans perte). Essai des correctifs validé par Jérôme. Pas de second tour de relecture : les correctifs sont ceux qu'elle proposait, signatures lues au `javap` (`Player.drop`, `handleCreativeModeItemDrop`, `canDropItems`, `DataComponentMap.Builder.set`, `ItemContainerContents.fromItems`). Mémo 26.3 §10 : pièges des piles au-delà du stack vanilla. |
 | 18/10/2026 | Étape 8 : compression (§5, « Implémentation »). Points ouverts de §7.4 relevés au `javap` : recettes lues par `MinecraftServer.getRecipeManager().getRecipes()`, une instance neuve de `RecipeManager` par `/reload` (`ReloadableServerResources`) ; ingrédients par `placementInfo()`, résultat par `assemble(CraftingInput.EMPTY)` (le champ `ItemStackTemplate result` est privé). Choix de Jérôme au plan : **tick programmé** au lieu d'un ticker (`ChestBlock` n'a pas de ticker serveur, `ChestBlock.tick` sert déjà au `recheckOpen`), tag `no_compression` **d'objets** appliqué à l'ingrédient et au bloc, vide par défaut, piles sans composants seulement, autant de blocs que la place permet. Table vanilla : 20 règles, aucune ambiguïté ; elle compresse aussi le blé en bottes de foin, la poudre d'os, le slime, les algues séchées, la résine et les minerais bruts. ⚠️ **Ce qui s'est révélé faux** : « drapeau + ticker » au plan — un tick programmé suffit et ne coûte rien au repos ; « API du `RecipeManager` à revoir » — elle n'a pas bougé pour la lecture, seuls le résultat (`ItemStackTemplate` privé) et les ingrédients (`placementInfo`) se lisent autrement ; `combine(…, false)` (celui du comparateur) aurait bloqué la compression d'un coffre recouvert d'un bloc ou d'un chat — `true`, comme l'entonnoir. Validé en jeu par Jérôme (émeraudes, quartz, cascade de pépites, coffre plein, capacité 128, double coffre, entonnoir, golem, bloc dessus, objets renommés, relance, `/reload`). **Relecture Opus** (arithmétique, persistance) : ni perte ni duplication (place comptée = place utilisée, même ordre de retrait, terminaison par baisse du nombre d'objets), rien côté client, table et signatures justes. Corrigé : le drapeau, non sauvegardé, perdait la compression d'un dépôt sauvegardé avant son tick (il vaut désormais `true` à la création) ; la baisse de `k` pouvait faire des milliers d'itérations pour un bloc à plafond bas (`k` saute à la place disponible) ; commentaires périmés. Documenté : coffre ouvert, la compression attend jusqu'à 5 ticks (le `recheckOpen` vanilla occupe le tick programmé). Pas de second tour de relecture : les correctifs sont ceux qu'elle proposait. Reste signalé : les tags d'objets du mod n'ont pas de traduction (`tag.item.smartchest.…`, avertissement Fabric au démarrage, depuis l'étape 7). |
+| 18/10/2026 | Étape 8b : compression forcée (§5.1, « Implémentation »). Choix de Jérôme au plan : client optimiste (il n'a pas les recettes, le serveur juge), plus grand `N` en cas d'ambiguïté, ingrédient à reste de craft exclu, double-clic exclu des emplacements forcés, infobulle sur emplacement vide, 5 emplacements dans une colonne. **Gestes** relevés au `javap` : un seul test suffit, `input == PICKUP` dans `mayPlace` (le champ `input` de l'étape 7) ; un glisser vide part en PICKUP. ⚠️ **Ce qui s'est révélé faux** : « la compression forcée réutilise le filtre de l'étape 8 sans l'inverse » — au premier lancement, la table forcée comptait 128 règles avec bateaux, plastron de cuir, casque de tortue, armure de loup, blocs ciselés, coussins et plaques de pression ; resserrée à la grille pleine 2×2/3×3 ou 4/9 sans forme, sans durabilité (🔷, 72 règles). « Poser des planches force les établis » : faux, l'établi prend le tag `#planks`. Validé en jeu par Jérôme (melon, quartz, améthyste, neige, objet refusé qui rebondit, shift-clic, touches 1–9 et F, glisser, double-clic, sans crafter, cascade de glace, infobulle, double coffre, casse, relance, caisses de Crate Delight). **Relecture Opus** (persistance, gestes du menu, arithmétique) : ni perte ni duplication ; un coffre de l'étape 8 se charge tel quel ; seul un PICKUP sur l'emplacement y fait entrer un objet (QUICK_MOVE en boucle, SWAP 0–8 et 40, CLONE, PICKUP_ALL, glisser à un emplacement, créatif, `handleLargePile` vérifiés ; un sac au curseur dépose par PICKUP) ; correction de prédiction confirmée au `javap` (`handleContainerClick` : `suppressRemoteUpdates`, `clicked`, `setRemoteSlotUnsafe`, `setRemoteCarried`, `resumeRemoteUpdates`, `broadcastChanges`) ; terminaison et absence de cycle de la table. Corrigé : la table forcée contenait la table normale (72 règles dont 48 doublons ; une émeraude posée ne faisait rien, contre l'infobulle) — elle n'en garde que les 24 autres ; l'avertissement d'ambiguïté pouvait porter sur une règle déjà dépassée par un plus grand `N` ; commentaires et spec périmés (dont « 9 tranches → un melon » : au-delà du plafond seulement). Pas de second tour de relecture : correctifs proposés par elle. Commité en l'absence de Jérôme, à sa demande : essai du correctif (une émeraude ou une pépite rebondit hors d'un emplacement forcé ; melon, quartz et glace toujours forcés) à faire à son retour. |

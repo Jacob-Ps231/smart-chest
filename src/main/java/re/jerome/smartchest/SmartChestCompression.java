@@ -24,7 +24,7 @@ import net.minecraft.world.item.crafting.ShapedRecipe;
 import net.minecraft.world.item.crafting.ShapelessRecipe;
 
 /**
- * The compression upgrade (SPEC §5): the table of compressions, read from the
+ * The compression upgrade (SPEC §5): the tables of compressions, read from the
  * crafting recipes, and the rule that turns piles into blocks. Server side only.
  */
 public final class SmartChestCompression {
@@ -34,6 +34,8 @@ public final class SmartChestCompression {
 	// Rebuilt on the server thread at start and after each /reload, read by the
 	// chests' ticks on the same thread.
 	private static Map<Item, Rule> table = Map.of();
+	// The same without the reverse recipe, for the forced compression slots (SPEC §5.1).
+	private static Map<Item, Rule> forcedTable = Map.of();
 
 	private SmartChestCompression() {
 	}
@@ -50,10 +52,16 @@ public final class SmartChestCompression {
 	 * A compression is a vanilla shaped or shapeless recipe from N times one item
 	 * (N ≥ 2) to one block without components, kept only if the block crafts back
 	 * into exactly N of that item. The first one found wins; the others are logged.
+	 * The forced table, for the items the normal one leaves out, does without the
+	 * reverse recipe, but then only takes a full 2x2 or 3x3 grid, or 4 or 9
+	 * shapeless, of something without durability; the largest N wins (prismarine
+	 * shards make bricks), ties are logged. Never an item with a crafting
+	 * remainder: the chest would destroy it (honey bottles).
 	 */
 	public static void rebuild(MinecraftServer server) {
 		List<Conversion> compressions = new ArrayList<>();
 		Set<Conversion> uncrafts = new HashSet<>();
+		Set<Conversion> forceable = new HashSet<>();
 		for (RecipeHolder<?> holder : server.getRecipeManager().getRecipes()) {
 			if (!(holder.value() instanceof CraftingRecipe recipe)
 					|| recipe.getSerializer() != ShapedRecipe.SERIALIZER && recipe.getSerializer() != ShapelessRecipe.SERIALIZER) {
@@ -64,35 +72,84 @@ public final class SmartChestCompression {
 			Optional<Item> from = singleItem(ingredients);
 			// Both recipe classes return their result here, whatever the input.
 			ItemStack result = recipe.assemble(CraftingInput.EMPTY);
-			if (from.isEmpty() || result.isEmpty() || !result.getComponentsPatch().isEmpty() || result.is(from.get())) {
+			if (from.isEmpty() || result.isEmpty() || !result.getComponentsPatch().isEmpty() || result.is(from.get())
+					|| from.get().getCraftingRemainder() != null) {
 				continue;
 			}
 			if (ingredients.size() >= 2 && result.getCount() == 1) {
-				compressions.add(new Conversion(from.get(), result.getItem(), ingredients.size()));
+				Conversion compression = new Conversion(from.get(), result.getItem(), ingredients.size());
+				compressions.add(compression);
+				if (isFullGrid(recipe, ingredients.size()) && !result.isDamageableItem()) {
+					forceable.add(compression);
+				}
 			} else if (ingredients.size() == 1 && result.getCount() >= 2) {
 				uncrafts.add(new Conversion(from.get(), result.getItem(), result.getCount()));
 			}
 		}
 
 		Map<Item, Rule> rules = new LinkedHashMap<>();
+		Map<Item, Rule> forced = new LinkedHashMap<>();
+		// A forced rule that ties with the one kept, while no larger N has replaced it.
+		Map<Item, Rule> ties = new LinkedHashMap<>();
 		for (Conversion compression : compressions) {
-			if (!uncrafts.contains(new Conversion(compression.to(), compression.from(), compression.count()))
-					|| compression.from().builtInRegistryHolder().is(NO_COMPRESSION)
+			if (compression.from().builtInRegistryHolder().is(NO_COMPRESSION)
 					|| compression.to().builtInRegistryHolder().is(NO_COMPRESSION)) {
 				continue;
 			}
 			Rule rule = new Rule(compression.to(), compression.count());
+			// Without the reverse recipe, the full grids only: no boats, pressure plates nor armour.
+			if (forceable.contains(compression)) {
+				Rule largest = forced.get(compression.from());
+				if (largest == null || rule.count() > largest.count()) {
+					forced.put(compression.from(), rule);
+					ties.remove(compression.from());
+				} else if (rule.count() == largest.count() && !rule.equals(largest)) {
+					ties.putIfAbsent(compression.from(), rule);
+				}
+			}
+			if (!uncrafts.contains(new Conversion(compression.to(), compression.from(), compression.count()))) {
+				continue;
+			}
 			Rule kept = rules.putIfAbsent(compression.from(), rule);
 			if (kept != null && !kept.equals(rule)) {
 				SmartChestMod.LOGGER.warn("Ambiguous compression of {}: {} kept, {} ignored (tag {} decides)",
 						name(compression.from()), describe(kept), describe(rule), NO_COMPRESSION.location());
 			}
 		}
+		// The forced slots are for what the normal table leaves out: an emerald compresses anyway.
+		forced.keySet().removeAll(rules.keySet());
+		ties.forEach((item, ignored) -> {
+			if (forced.containsKey(item)) {
+				SmartChestMod.LOGGER.warn("Ambiguous forced compression of {}: {} kept, {} ignored (tag {} decides)",
+						name(item), describe(forced.get(item)), describe(ignored), NO_COMPRESSION.location());
+			}
+		});
 		table = Map.copyOf(rules);
+		forcedTable = Map.copyOf(forced);
+		log("Compression table", rules);
+		log("Forced compression table", forced);
+	}
+
+	private static void log(String title, Map<Item, Rule> rules) {
 		List<String> lines = rules.entrySet().stream()
 				.map(entry -> name(entry.getKey()) + " " + describe(entry.getValue()))
 				.toList();
-		SmartChestMod.LOGGER.info("Compression table: {} rules: {}", rules.size(), String.join(", ", lines));
+		SmartChestMod.LOGGER.info("{}: {} rules: {}", title, rules.size(), String.join(", ", lines));
+	}
+
+	/** Whether a forced compression slot takes this item: it is in the forced table (SPEC §5.1). */
+	public static boolean canForce(ItemStack stack) {
+		return forcedTable.containsKey(stack.getItem());
+	}
+
+	/** Whether the recipe fills a 2x2 or 3x3 grid, or is a shapeless one of 4 or 9 ingredients. */
+	private static boolean isFullGrid(CraftingRecipe recipe, int ingredients) {
+		if (ingredients != 4 && ingredients != 9) {
+			return false;
+		}
+		// placementInfo leaves out the empty cells: a full grid is width x height of them.
+		return !(recipe instanceof ShapedRecipe shaped)
+				|| shaped.getWidth() == shaped.getHeight() && shaped.getWidth() * shaped.getHeight() == ingredients;
 	}
 
 	/** The item every ingredient is, if they are all the same single item. */
@@ -120,9 +177,10 @@ public final class SmartChestCompression {
 	 * SPEC §5: while the total of an item in the chest is above its per-slot cap and
 	 * makes at least one block, N of it become one block, as long as the block fits.
 	 * Again until nothing changes, for the cascades (nuggets, ingots, blocks). It
-	 * ends: each compression lowers the number of items in the chest.
+	 * ends: each compression lowers the number of items in the chest. The items in
+	 * {@code forced} compress without a reverse recipe too (SPEC §5.1).
 	 */
-	public static void compress(Container chest, ItemStack capacityUpgrade) {
+	public static void compress(Container chest, ItemStack capacityUpgrade, Set<Item> forced) {
 		boolean changed;
 		do {
 			changed = false;
@@ -130,6 +188,9 @@ public final class SmartChestCompression {
 			for (int slot = 0; slot < chest.getContainerSize(); slot++) {
 				ItemStack stack = chest.getItem(slot);
 				Rule rule = table.get(stack.getItem());
+				if (rule == null && forced.contains(stack.getItem())) {
+					rule = forcedTable.get(stack.getItem());
+				}
 				if (rule != null && isPlain(stack) && done.add(stack.getItem())) {
 					changed |= compress(chest, capacityUpgrade, stack.getItem(), rule);
 				}
