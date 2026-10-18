@@ -8,6 +8,7 @@
 		"Jerome"
 	],
 	"license": "MIT",
+	"icon": "assets/smartchest/icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": [
