@@ -19,5 +19,7 @@
   "item.smartchest.capacity_upgrade_128": "Capacity Upgrade (128)",
   "item.smartchest.capacity_upgrade_256": "Capacity Upgrade (256)",
   "item.smartchest.capacity_upgrade_512": "Capacity Upgrade (512)",
-  "item.smartchest.capacity_upgrade_999": "Capacity Upgrade (999)"
+  "item.smartchest.capacity_upgrade_999": "Capacity Upgrade (999)",
+  "tag.item.smartchest.no_capacity_upgrade": "Not Raised by Capacity Upgrades",
+  "tag.item.smartchest.no_compression": "Never Compressed by Smart Chests"
 }

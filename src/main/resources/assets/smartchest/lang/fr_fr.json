@@ -19,5 +19,7 @@
   "item.smartchest.capacity_upgrade_128": "Amélioration de capacité (128)",
   "item.smartchest.capacity_upgrade_256": "Amélioration de capacité (256)",
   "item.smartchest.capacity_upgrade_512": "Amélioration de capacité (512)",
-  "item.smartchest.capacity_upgrade_999": "Amélioration de capacité (999)"
+  "item.smartchest.capacity_upgrade_999": "Amélioration de capacité (999)",
+  "tag.item.smartchest.no_capacity_upgrade": "Non relevés par les améliorations de capacité",
+  "tag.item.smartchest.no_compression": "Jamais compressés par les coffres intelligents"
 }
