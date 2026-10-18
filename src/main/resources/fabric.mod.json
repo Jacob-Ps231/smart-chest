@@ -7,6 +7,11 @@
 	"authors": [
 		"Jerome"
 	],
+	"contact": {
+		"homepage": "https://github.com/Jacob-Ps231/smartchest",
+		"sources": "https://github.com/Jacob-Ps231/smartchest",
+		"issues": "https://github.com/Jacob-Ps231/smartchest/issues"
+	},
 	"license": "MIT",
 	"icon": "assets/smartchest/icon.png",
 	"environment": "*",
