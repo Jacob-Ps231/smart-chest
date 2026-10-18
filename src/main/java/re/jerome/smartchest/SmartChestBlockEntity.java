@@ -32,7 +32,8 @@ import net.minecraft.world.phys.Vec3;
 
 // The lid, the items list and dropping the contents when broken are inherited: the
 // copper golem queues only for a ChestBlockEntity (SPEC §3). Overridden for the
-// capacity upgrade (SPEC §4.1): setItem, saving, loading and the creative copy.
+// capacity upgrade (SPEC §4.1): setItem, saving, loading and the creative copy;
+// setChanged for the compression upgrade (SPEC §5).
 public class SmartChestBlockEntity extends ChestBlockEntity {
 	public static final int CAPACITY_SLOT = 0;
 	public static final int COMPRESSION_SLOT = 1;
@@ -44,14 +45,19 @@ public class SmartChestBlockEntity extends ChestBlockEntity {
 	private static final String LARGE_ITEMS_KEY = "large_items";
 
 	// Apart from the inherited items, which are all the golem and hoppers see
-	// (SPEC §2.2): only the screen shows these, and the comparator reads the
-	// capacity upgrade's caps.
+	// (SPEC §2.2): only the screen shows these, the comparator reads the capacity
+	// upgrade's caps, and the compression looks for the crafter.
 	private final SimpleContainer upgrades = new SimpleContainer(UPGRADE_KEYS.length) {
 		@Override
 		public void setChanged() {
 			SmartChestBlockEntity.this.setChanged();
 		}
 	};
+
+	// Set by setChanged, cleared by the compression the scheduled tick runs (SPEC §5).
+	// Not saved, but the scheduled tick is: raised from the start, so that a change
+	// saved before its tick ran is still compressed after a reload.
+	boolean compressionPending = true;
 
 	public SmartChestBlockEntity(BlockPos pos, BlockState state) {
 		super(SmartChestBlocks.BLOCK_ENTITY, pos, state);
@@ -104,6 +110,19 @@ public class SmartChestBlockEntity extends ChestBlockEntity {
 		unpackLootTable(null);
 		getItems().set(slot, stack);
 		setChanged();
+	}
+
+	@Override
+	public void setChanged() {
+		super.setChanged();
+		// Compression reacts to every change, not to an insertion path: the copper golem
+		// writes by setItem (SPEC §3). Next tick, in SmartChestBlock.tick; vanilla keeps
+		// one scheduled tick per position, and an idle chest costs nothing. While the
+		// chest is open, the recheck vanilla schedules 5 ticks ahead takes its place.
+		if (level instanceof ServerLevel && SmartChestConfig.get().compression().enabled()) {
+			compressionPending = true;
+			level.scheduleTick(worldPosition, getBlockState().getBlock(), 1);
+		}
 	}
 
 	@Override

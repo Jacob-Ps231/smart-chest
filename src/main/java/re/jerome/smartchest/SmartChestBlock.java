@@ -4,8 +4,11 @@ import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.CompoundContainer;
+import net.minecraft.world.Container;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -67,6 +70,30 @@ public class SmartChestBlock extends ChestBlock {
 				}
 			};
 
+	// The chest's container with the first half's upgrades, as for the menu, which
+	// apply to both halves. Clears both halves' flags after the pass, whose own
+	// setItem calls have raised them.
+	private static final DoubleBlockCombiner.Combiner<ChestBlockEntity, Boolean> COMPRESSIONS =
+			new DoubleBlockCombiner.Combiner<>() {
+				@Override
+				public Boolean acceptDouble(ChestBlockEntity first, ChestBlockEntity second) {
+					compress(new CompoundContainer(first, second), (SmartChestBlockEntity) first);
+					((SmartChestBlockEntity) second).compressionPending = false;
+					return true;
+				}
+
+				@Override
+				public Boolean acceptSingle(ChestBlockEntity single) {
+					compress(single, (SmartChestBlockEntity) single);
+					return true;
+				}
+
+				@Override
+				public Boolean acceptNone() {
+					return false;
+				}
+			};
+
 	private final String wood;
 
 	public SmartChestBlock(String wood, Properties properties) {
@@ -96,6 +123,24 @@ public class SmartChestBlock extends ChestBlock {
 	protected int getAnalogOutputSignal(BlockState state, Level level, BlockPos pos, Direction direction) {
 		// ChestBlock's reads Container.getMaxStackSize(ItemStack): the vanilla stack.
 		return combine(state, level, pos, false).apply(SIGNALS);
+	}
+
+	@Override
+	protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
+		// ChestBlock's recheckOpen, then the compression SmartChestBlockEntity.setChanged
+		// scheduled. Even under a block or a cat (true), unlike the comparator's combine.
+		super.tick(state, level, pos, random);
+		if (level.getBlockEntity(pos) instanceof SmartChestBlockEntity chest && chest.compressionPending) {
+			combine(state, level, pos, true).apply(COMPRESSIONS);
+		}
+	}
+
+	private static void compress(Container chest, SmartChestBlockEntity first) {
+		if (SmartChestConfig.get().compression().enabled()
+				&& SmartChestItems.isCompressionUpgrade(first.upgrades().getItem(SmartChestBlockEntity.COMPRESSION_SLOT))) {
+			SmartChestCompression.compress(chest, capacityUpgrade(first));
+		}
+		first.compressionPending = false;
 	}
 
 	private static ItemStack capacityUpgrade(ChestBlockEntity chest) {
