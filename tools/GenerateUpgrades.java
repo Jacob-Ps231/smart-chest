@@ -16,7 +16,8 @@ import javax.imageio.ImageIO;
 /**
  * Generates the files of the upgrades (SPEC §4, step 6): for each capacity upgrade,
  * its item, item model, recipe and sprite; the empty slot icons of the capacity,
- * crafter and forced compression (step 8b) slots; and the chest screen background,
+ * crafter and forced compression (step 8b) slots; the sorting buttons (step 10): three
+ * frames and an icon per mode; and the chest screen background,
  * generic_54.png with the upgrade panel. Then reads everything back. Names and
  * translations are in the language files, by hand.
  *
@@ -66,6 +67,14 @@ public class GenerateUpgrades {
 			writeImage(ASSETS.resolve("textures/gui/sprites/container/slot/capacity_upgrade.png"), capacityIcon());
 			writeImage(ASSETS.resolve("textures/gui/sprites/container/slot/compression_upgrade.png"), compressionIcon());
 			writeImage(ASSETS.resolve("textures/gui/sprites/container/slot/forced_compression.png"), forcedIcon());
+			Path sort = ASSETS.resolve("textures/gui/sprites/container/sort");
+			writeImage(sort.resolve("button.png"), sortButton(0xFF1E1E1E, 0xFFFFFFFF, 0xFF555555, 0xFFC6C6C6));
+			writeImage(sort.resolve("button_highlighted.png"), sortButton(0xFFFFFFFF, 0xFFFFFFFF, 0xFF555555, 0xFFD8D8D8));
+			// Pressed: light and shadow swapped, darker.
+			writeImage(sort.resolve("button_selected.png"), sortButton(0xFF1E1E1E, 0xFF555555, 0xFFFFFFFF, 0xFF9C9C9C));
+			for (Map.Entry<String, BufferedImage> icon : sortIcons().entrySet()) {
+				writeImage(sort.resolve(icon.getKey() + ".png"), icon.getValue());
+			}
 			writeImage(ASSETS.resolve("textures/gui/container/smart_chest.png"),
 					background(read(jar, VANILLA + "gui/container/generic_54.png")));
 		}
@@ -173,6 +182,90 @@ public class GenerateUpgrades {
 			}
 		}
 		return image;
+	}
+
+	/**
+	 * A sorting button frame, 16x16: an outline without its corners, a light top-left
+	 * edge, a shadowed bottom-right one, and the body.
+	 */
+	static BufferedImage sortButton(int outline, int light, int shadow, int body) {
+		BufferedImage image = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+		for (int y = 0; y < 16; y++) {
+			for (int x = 0; x < 16; x++) {
+				boolean edgeX = x == 0 || x == 15;
+				boolean edgeY = y == 0 || y == 15;
+				int colour = edgeX && edgeY ? 0 : edgeX || edgeY ? outline
+						: x == 1 || y == 1 ? light : x == 14 || y == 14 ? shadow : body;
+				image.setRGB(x, y, colour);
+			}
+		}
+		return image;
+	}
+
+	/** The icon of each sorting mode, by SmartChestSorting.Mode key, inside the frame's body. */
+	static Map<String, BufferedImage> sortIcons() {
+		Map<String, BufferedImage> icons = new LinkedHashMap<>();
+		int ink = 0xFF404040;
+		// Category: four squares of the colours of the first tabs.
+		BufferedImage category = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+		int[] colours = {0xFF5DAE3C, 0xFF9A6A3A, 0xFF3C6EC8, 0xFFC83C3C};
+		for (int n = 0; n < 4; n++) {
+			fillRect(category, 3 + n % 2 * 6, 3 + n / 2 * 6, 4, 4, colours[n]);
+		}
+		icons.put("category", category);
+		// Name: an A, and an arrow down beside it.
+		icons.put("name", pattern(ink,
+				"..........",
+				".###......",
+				"#...#..#..",
+				"#...#..#..",
+				"#####..#..",
+				"#...#..#..",
+				"#...#.###.",
+				"#...#..#..",
+				"..........",
+				".........."));
+		// Quantity: four bars, tallest first.
+		BufferedImage quantity = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+		for (int n = 0; n < 4; n++) {
+			int height = 9 - 2 * n;
+			fillRect(quantity, 3 + 3 * n, 13 - height, 2, height, ink);
+		}
+		icons.put("quantity", quantity);
+		// Id: a hash sign.
+		icons.put("id", pattern(ink,
+				"..........",
+				"...#..#...",
+				"...#..#...",
+				".########.",
+				"...#..#...",
+				"...#..#...",
+				".########.",
+				"...#..#...",
+				"...#..#...",
+				".........."));
+		return icons;
+	}
+
+	/** A 10x10 drawing at (3, 3) of a 16x16 image: # is ink, anything else transparent. */
+	static BufferedImage pattern(int ink, String... rows) {
+		BufferedImage image = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+		for (int y = 0; y < rows.length; y++) {
+			for (int x = 0; x < rows[y].length(); x++) {
+				if (rows[y].charAt(x) == '#') {
+					image.setRGB(3 + x, 3 + y, ink);
+				}
+			}
+		}
+		return image;
+	}
+
+	static void fillRect(BufferedImage image, int x0, int y0, int w, int h, int argb) {
+		for (int y = y0; y < y0 + h; y++) {
+			for (int x = x0; x < x0 + w; x++) {
+				image.setRGB(x, y, argb);
+			}
+		}
 	}
 
 	/** Darkest, middle and lightest colours of a texture, by brightness, transparent pixels left out. */
@@ -297,7 +390,7 @@ public class GenerateUpgrades {
 				}
 			}
 		}
-		int expected = UPGRADES.size() * 4 + 4;
+		int expected = UPGRADES.size() * 4 + 4 + 7;
 		if (written.size() != expected) {
 			errors.add(written.size() + " files written, " + expected + " expected");
 		}

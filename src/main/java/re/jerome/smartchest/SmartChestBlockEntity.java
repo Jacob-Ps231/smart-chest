@@ -19,6 +19,7 @@ import net.minecraft.world.Containers;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.DataSlot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.ItemContainerContents;
@@ -33,7 +34,7 @@ import net.minecraft.world.phys.Vec3;
 // The lid, the items list and dropping the contents when broken are inherited: the
 // copper golem queues only for a ChestBlockEntity (SPEC §3). Overridden for the
 // capacity upgrade (SPEC §4.1): setItem, saving, loading and the creative copy;
-// setChanged for the compression upgrade (SPEC §5).
+// setChanged for the compression upgrade (SPEC §5); the sorting mode (SPEC §5.2).
 public class SmartChestBlockEntity extends ChestBlockEntity {
 	public static final int CAPACITY_SLOT = 0;
 	public static final int COMPRESSION_SLOT = 1;
@@ -47,6 +48,7 @@ public class SmartChestBlockEntity extends ChestBlockEntity {
 	// The count field of ItemStack.CODEC stops here (SPEC §4.1).
 	private static final int CODEC_MAX_COUNT = 99;
 	private static final String LARGE_ITEMS_KEY = "large_items";
+	private static final String SORT_MODE_KEY = "sort_mode";
 
 	// Apart from the inherited items, which are all the golem and hoppers see
 	// (SPEC §2.2): only the screen shows these, the comparator reads the capacity
@@ -62,6 +64,10 @@ public class SmartChestBlockEntity extends ChestBlockEntity {
 	// Not saved, but the scheduled tick is: raised from the start, so that a change
 	// saved before its tick ran is still compressed after a reload.
 	boolean compressionPending = true;
+
+	// The last sorting button used, which the sort after a compression follows
+	// (SPEC §5.2). A double chest reads its first half's.
+	SmartChestSorting.Mode sortMode = SmartChestSorting.Mode.CATEGORY;
 
 	public SmartChestBlockEntity(BlockPos pos, BlockState state) {
 		super(SmartChestBlocks.BLOCK_ENTITY, pos, state);
@@ -113,6 +119,22 @@ public class SmartChestBlockEntity extends ChestBlockEntity {
 		return upgrades;
 	}
 
+	/** The sorting mode as the menu sends it to the client, which highlights its button. */
+	DataSlot sortModeSlot() {
+		return new DataSlot() {
+			@Override
+			public int get() {
+				return sortMode.ordinal();
+			}
+
+			@Override
+			public void set(int mode) {
+				sortMode = SmartChestSorting.Mode.values()[mode];
+				setChanged();
+			}
+		};
+	}
+
 	@Override
 	public void setItem(int slot, ItemStack stack) {
 		// BaseContainerBlockEntity's, without its limitSize, which would cut a pile
@@ -145,7 +167,7 @@ public class SmartChestBlockEntity extends ChestBlockEntity {
 	@Override
 	protected AbstractContainerMenu createMenu(int containerId, Inventory inventory) {
 		// A single chest; ChestBlock asks SmartChestBlock for a double one.
-		return SmartChestMenu.single(containerId, inventory, this, upgrades);
+		return SmartChestMenu.single(containerId, inventory, this);
 	}
 
 	@Override
@@ -155,6 +177,7 @@ public class SmartChestBlockEntity extends ChestBlockEntity {
 		for (int slot = 0; slot < UPGRADE_KEYS.length; slot++) {
 			upgrades.getItems().set(slot, input.read(UPGRADE_KEYS[slot], ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY));
 		}
+		sortMode = SmartChestSorting.Mode.byKey(input.getStringOr(SORT_MODE_KEY, ""));
 		// The piles above 99, over the list ChestBlockEntity has just loaded. Their
 		// count is kept even above a cap lowered since: nothing is lost. Not with a
 		// loot table waiting, when ChestBlockEntity loads no items either.
@@ -197,6 +220,7 @@ public class SmartChestBlockEntity extends ChestBlockEntity {
 		for (int slot = 0; slot < UPGRADE_KEYS.length; slot++) {
 			output.store(UPGRADE_KEYS[slot], ItemStack.OPTIONAL_CODEC, upgrades.getItem(slot));
 		}
+		output.putString(SORT_MODE_KEY, sortMode.key());
 	}
 
 	@Override

@@ -178,9 +178,11 @@ public final class SmartChestCompression {
 	 * makes at least one block, N of it become one block, as long as the block fits.
 	 * Again until nothing changes, for the cascades (nuggets, ingots, blocks). It
 	 * ends: each compression lowers the number of items in the chest. The items in
-	 * {@code forced} compress without a reverse recipe too (SPEC §5.1).
+	 * {@code forced} compress without a reverse recipe too (SPEC §5.1). Returns whether
+	 * anything was compressed, for the sort that follows (SPEC §5.2).
 	 */
-	public static void compress(Container chest, ItemStack capacityUpgrade, Set<Item> forced) {
+	public static boolean compress(Container chest, ItemStack capacityUpgrade, Set<Item> forced) {
+		boolean any = false;
 		boolean changed;
 		do {
 			changed = false;
@@ -195,7 +197,9 @@ public final class SmartChestCompression {
 					changed |= compress(chest, capacityUpgrade, stack.getItem(), rule);
 				}
 			}
+			any |= changed;
 		} while (changed);
+		return any;
 	}
 
 	/** Only piles without components count and change: renamed emeralds stay emeralds. */

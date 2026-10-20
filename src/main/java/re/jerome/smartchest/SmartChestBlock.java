@@ -148,7 +148,15 @@ public class SmartChestBlock extends ChestBlock {
 					forced.add(stack.getItem());
 				}
 			}
-			SmartChestCompression.compress(chest, capacityUpgrade(first), forced);
+			// Then the whole chest is sorted with the last button used (SPEC §5.2), and
+			// compressed again: the merge may free the slot a block lacked. It ends, as
+			// each compression lowers the number of items. The sort's writes raise the
+			// flag again: cleared below.
+			if (SmartChestCompression.compress(chest, capacityUpgrade(first), forced)) {
+				do {
+					SmartChestSorting.sort(chest, capacityUpgrade(first), first.sortMode);
+				} while (SmartChestCompression.compress(chest, capacityUpgrade(first), forced));
+			}
 		}
 		first.compressionPending = false;
 	}
@@ -164,8 +172,7 @@ public class SmartChestBlock extends ChestBlock {
 			if (first.canOpen(player) && second.canOpen(player)) {
 				first.unpackLootTable(inventory.player);
 				second.unpackLootTable(inventory.player);
-				return SmartChestMenu.twoHalves(containerId, inventory, new CompoundContainer(first, second),
-						first.upgrades());
+				return SmartChestMenu.twoHalves(containerId, inventory, new CompoundContainer(first, second), first);
 			}
 			if (!player.isSpectator()) {
 				Direction toSecond = ChestBlock.getConnectedDirection(first.getBlockState());

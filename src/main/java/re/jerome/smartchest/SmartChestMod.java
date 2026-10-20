@@ -19,11 +19,16 @@ public class SmartChestMod implements ModInitializer {
 		SmartChestConfig.load();
 		SmartChestBlocks.register();
 		SmartChestItems.register();
-		// The compression table follows the recipes and the no_compression tag (SPEC §5).
-		ServerLifecycleEvents.SERVER_STARTED.register(SmartChestCompression::rebuild);
+		// The compression table follows the recipes and the no_compression tag (SPEC §5),
+		// the sorting order the creative tabs, which read registries and tags (SPEC §5.2).
+		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+			SmartChestCompression.rebuild(server);
+			SmartChestSorting.rebuild(server);
+		});
 		ServerLifecycleEvents.END_DATA_PACK_RELOAD.register((server, resources, success) -> {
 			if (success) {
 				SmartChestCompression.rebuild(server);
+				SmartChestSorting.rebuild(server);
 			}
 		});
 		LOGGER.info("Smart Chest loaded");

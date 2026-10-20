@@ -3,3 +3,7 @@ accessWidener	v1	official
 # The item of the chest renders through our own special model type (SmartChestItemRenderer), and
 # vanilla registers these types in this private mapper, for which Fabric has no API.
 accessible	field	net/minecraft/client/renderer/special/SpecialModelRenderers	ID_MAPPER	Lnet/minecraft/util/ExtraCodecs$LateBoundIdMapper;
+
+# The sorting order runs each creative tab's generator into lists of its own (SmartChestSorting.rebuild):
+# building the tabs themselves would share their static cache with the client thread in single player.
+accessible	field	net/minecraft/world/item/CreativeModeTab	displayItemsGenerator	Lnet/minecraft/world/item/CreativeModeTab$DisplayItemsGenerator;

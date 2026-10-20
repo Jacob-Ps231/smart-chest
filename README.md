@@ -3,7 +3,7 @@
 A chest that works like the vanilla one — same size, same double chest, same hoppers, same comparator, **same
 copper golem** — with upgrade slots next to its inventory. One upgrade raises how many items a slot holds, up to
 **999**. Another **compresses piles into blocks** on its own, so a full stack of emeralds becomes a block of
-emeralds instead of a second slot.
+emeralds instead of a second slot. Four **sorting buttons** merge and order the chest, piles above 64 included.
 
 For Minecraft **26.3**, on Fabric.
 
@@ -125,6 +125,36 @@ In vanilla 26.3, 24 items can be forced: amethyst shards, quartz, glowstone dust
 bamboo, melon slices, nether wart, ice, packed ice, bricks, nether bricks, resin bricks, sand, red sand, string,
 rabbit hide (into leather), disc fragments (into music disc 5), prismarine shards, magma cream, pointed dripstone,
 sulfur and sulfur spikes.
+
+## Sorting
+
+Four buttons sit on the left of the chest screen, one per order. A click **merges** identical piles — same item,
+same data — up to the cap of the capacity upgrade, then **sorts** the whole chest, empty slots last. A double
+chest is sorted as one 54-slot inventory. The upgrade slots never move.
+
+| Button | Order |
+| --- | --- |
+| Category | the order of the creative tabs, items added by other mods included |
+| Name | the item names; on a dedicated server, the English names |
+| Quantity | the total of each item in the chest, largest first |
+| ID | the item id, `namespace:path` |
+
+- **After each compression**, the chest sorts itself again in the order of the **last button used**, which stays
+  pressed and is saved with the chest. A plain deposit does not sort the chest: items brought by a golem or a
+  hopper stay where they land until the next button press or compression.
+- Until a button is pressed, a chest sorts itself by **category** after a compression.
+- **Nothing is lost.** Each slot gives at most one pile, so the result always fits. Items that keep their vanilla stack size
+  (tools, shulker boxes…) merge only up to it. The server does the sorting.
+
+**Inventory Sorter.** Its own sort button does not know about the capacity upgrade and merges piles only up to
+64. It offers no way for another mod to hide its button, so set it up on its side, with the ids
+`smartchest:smart_chest` and `smartchest:double_smart_chest`:
+
+- in `config/inventorysorter.json`, add both ids to `hideButtonsForScreens` (hides its button) and to
+  `preventSortForScreens` (also turns off its key and double-click sorting in these chests);
+- or, as an operator, `/invsort admin hidebutton add` and `/invsort admin nosort add` while looking at a Smart
+  Chest;
+- or Ctrl+click its button in the chest screen, which hides it for you only.
 
 ## Copper golems
 

@@ -8,6 +8,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.ContainerInput;
+import net.minecraft.world.inventory.DataSlot;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
@@ -21,7 +22,7 @@ import net.minecraft.world.item.ItemStack;
 //
 // The capacity caps live in the chest slots (SPEC §4.1), on both sides: the client
 // reads the capacity upgrade from its copy of the upgrade slot, which the server keeps
-// in sync like any other slot.
+// in sync like any other slot. The sorting buttons go through clickMenuButton.
 public class SmartChestMenu extends ChestMenu {
 	/** Upgrade slot positions, beside the chest rows (the screen draws them there). */
 	public static final int UPGRADE_X = 186;
@@ -39,10 +40,15 @@ public class SmartChestMenu extends ChestMenu {
 	// slots' mayPlace (see there).
 	private ContainerInput input;
 
+	// The chest's sorting mode (SPEC §5.2): the block entity's on the server, a copy
+	// the server keeps in sync on the client.
+	private final DataSlot sortMode;
+
 	private SmartChestMenu(MenuType<?> type, int containerId, Inventory inventory, Container chest, int rows,
-			Container upgrades) {
+			Container upgrades, DataSlot sortMode) {
 		super(type, containerId, inventory, chest, rows);
 		this.upgrades = upgrades;
+		this.sortMode = addDataSlot(sortMode);
 		chestEnd = rows * 9;
 		// ChestMenu's chest slots are plain Slots (its addChestGrid is private):
 		// swapped in place, same index and position, for ones that know the cap.
@@ -70,22 +76,54 @@ public class SmartChestMenu extends ChestMenu {
 	}
 
 	/** Server side, a single chest. */
-	public static SmartChestMenu single(int containerId, Inventory inventory, Container chest, Container upgrades) {
-		return new SmartChestMenu(SmartChestBlocks.MENU, containerId, inventory, chest, 3, upgrades);
+	public static SmartChestMenu single(int containerId, Inventory inventory, SmartChestBlockEntity chest) {
+		return new SmartChestMenu(SmartChestBlocks.MENU, containerId, inventory, chest, 3, chest.upgrades(),
+				chest.sortModeSlot());
 	}
 
-	/** Server side, a double chest: {@code upgrades} are those of its first half, which apply to both. */
-	public static SmartChestMenu twoHalves(int containerId, Inventory inventory, Container chest, Container upgrades) {
-		return new SmartChestMenu(SmartChestBlocks.DOUBLE_MENU, containerId, inventory, chest, 6, upgrades);
+	/** Server side, a double chest: the upgrades and sorting mode of its first half apply to both. */
+	public static SmartChestMenu twoHalves(int containerId, Inventory inventory, Container chest,
+			SmartChestBlockEntity first) {
+		return new SmartChestMenu(SmartChestBlocks.DOUBLE_MENU, containerId, inventory, chest, 6, first.upgrades(),
+				first.sortModeSlot());
 	}
 
 	/** Client side: empty containers, which the server fills. */
 	public static SmartChestMenu single(int containerId, Inventory inventory) {
-		return single(containerId, inventory, mirror(27), new SimpleContainer(SmartChestBlockEntity.UPGRADE_SLOTS));
+		return new SmartChestMenu(SmartChestBlocks.MENU, containerId, inventory, mirror(27), 3,
+				new SimpleContainer(SmartChestBlockEntity.UPGRADE_SLOTS), DataSlot.standalone());
 	}
 
 	public static SmartChestMenu twoHalves(int containerId, Inventory inventory) {
-		return twoHalves(containerId, inventory, mirror(54), new SimpleContainer(SmartChestBlockEntity.UPGRADE_SLOTS));
+		return new SmartChestMenu(SmartChestBlocks.DOUBLE_MENU, containerId, inventory, mirror(54), 6,
+				new SimpleContainer(SmartChestBlockEntity.UPGRADE_SLOTS), DataSlot.standalone());
+	}
+
+	/** The last sorting mode used, whose button the screen highlights. */
+	public SmartChestSorting.Mode sortMode() {
+		// The client's copy reads 0 until the server's value arrives: the default.
+		return SmartChestSorting.Mode.values()[Math.floorMod(sortMode.get(), SmartChestSorting.Mode.values().length)];
+	}
+
+	/**
+	 * A sorting button (SPEC §5.2), id = the mode: vanilla's container button packet,
+	 * which ServerGamePacketListenerImpl.handleContainerButtonClick hands over on the
+	 * server thread, for this menu only, never for a spectator, and only while
+	 * stillValid; it then broadcasts the changes. The client calls this too, ahead of
+	 * the server, for the highlight; only the server sorts.
+	 */
+	@Override
+	public boolean clickMenuButton(Player player, int id) {
+		if (id < 0 || id >= SmartChestSorting.Mode.values().length) {
+			return false;
+		}
+		sortMode.set(id);
+		if (!client) {
+			// A drag the sort interrupts would end on slots holding something else.
+			resetQuickCraft();
+			SmartChestSorting.sort(getContainer(), capacityUpgrade(), SmartChestSorting.Mode.values()[id]);
+		}
+		return true;
 	}
 
 	/**

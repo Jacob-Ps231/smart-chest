@@ -5,8 +5,8 @@ Les instructions de travail permanentes sont dans `CLAUDE.md`, les pièges de la
 machine et de Minecraft 26.3 dans `../SETUP-MC-MODDING-26.3.md` (et §1 et §4 de
 `../SETUP-MC-MODDING-26.2.md`).
 
-Statut : étapes 1 à 8b faites ; étape 9 faite : release 0.1.0+26.3 publiée sur GitHub ; reste la page Modrinth, à la main.
-Dernière mise à jour : 18/10/2026.
+Statut : 0.1.0+26.3 publiée (étapes 1 à 9) ; étape 10 (rangement, §5.2) faite et commitée, release 0.2.0+26.3 à faire sur feu vert de Jérôme.
+Dernière mise à jour : 20/10/2026.
 
 Conventions de ce fichier :
 
@@ -347,6 +347,117 @@ Choix du plan de l'étape 8b ✅ (Jérôme, 18/10/2026) :
 
 Implémenté à l'étape : 8b.
 
+### 5.2 Rangement ✅ (20/10/2026, demande de Jérôme)
+
+Constat en jeu (0.1.0) : Inventory Sorter regroupe mal les piles au-delà de 64
+(il ne connaît que le stack vanilla) ; le golem et les entonnoirs remplissent
+une autre case dès que la pile dépasse 64 (choix de l'étape 7, §4.1). D'où un
+rangement propre au coffre.
+
+- **Un bouton par mode** ✅ (Jérôme, au plan de l'étape 10 : plus simple qu'un
+  bouton à mode tournant), en colonne **en haut à gauche** de l'écran, hors du
+  cadre. Le client envoie une demande, **le serveur range** (paquet client →
+  serveur, jamais de tri côté client).
+- **Ranger = regrouper puis ordonner** ✅ : les piles identiques (même objet,
+  mêmes composants) sont fusionnées jusqu'au plafond de capacité de
+  l'emplacement (`maxStackSize`, §4), puis tout le coffre est remis dans
+  l'ordre choisi, cases vides à la fin. Les emplacements d'amélioration ne
+  bougent jamais. Aucun objet perdu ni dupliqué ; un objet exclu de la capacité
+  (durable, tag `no_capacity_upgrade`) reste à son stack vanilla.
+- **Modes** ✅ (inspirés des modes d'Inventory Sorter, Inventory Profiles Next
+  et Traveler's Backpack, d'après leurs textes, sans lire leur code) :
+  **Catégorie** (ordre des onglets du mode créatif, défaut), **Nom** (nom
+  affiché), **Quantité** (total décroissant), **ID**. ✅ Le **dernier bouton
+  utilisé** est mémorisé dans le coffre (NBT), sur la moitié principale d'un
+  double coffre, et reste enfoncé ; infobulle « Ranger par <mode> » et, en
+  gris, qu'il sert aussi après chaque compression.
+- **Automatique** ✅ : **tri complet après une compression** qui a changé
+  quelque chose, dans le dernier mode utilisé (même tick programmé, §5). Pas de tri
+  automatique sur un simple dépôt : les citrouilles du golem restent dans leur
+  case jusqu'au bouton ou à une compression (choix de Jérôme, à revoir s'il le
+  souhaite).
+- **Double coffre** : les 54 cases rangées comme un seul inventaire.
+- **Inventory Sorter** ✅ : **documenté dans le README**, faute de voie
+  officielle pour un autre mod (relevé à l'étape 10, javap de la 3.0.1 et
+  inventorysorter.meza.gg) : son « système de compatibilité »
+  (`CompatibilityPlugins`) est une liste interne (Trinkets seul, pour les
+  sacs), sans point d'entrée. Les voies officielles sont du côté du joueur ou
+  de l'admin : `hideButtonsForScreens` et `preventSortForScreens` de
+  `config/inventorysorter.json`, `/invsort admin hidebutton add` et
+  `/invsort admin nosort add`, Ctrl+clic sur son bouton, liste distante
+  (`customCompatibilityListDownloadUrl`). Ids de nos écrans :
+  `smartchest:smart_chest`, `smartchest:double_smart_chest`. Écarté : un
+  `data/inventorysorter/hide-buttons.json` dans notre jar — il le lit comme
+  ressource de classe, le nôtre masquerait le sien. Possible plus tard, sur feu
+  vert de Jérôme : une PR qui ajoute nos deux ids à la liste officielle de son
+  dépôt (`hide-buttons.json`, qu'il télécharge au démarrage).
+
+**Implémentation (étape 10)** :
+
+- **Réseau** : aucun paquet maison. Le paquet vanilla des boutons de menu
+  (`ServerboundContainerButtonClickPacket`, celui du tailleur de pierre) :
+  l'écran appelle `menu.clickMenuButton` puis
+  `MultiPlayerGameMode.handleInventoryButtonClick(containerId, mode)`.
+  `ServerGamePacketListenerImpl.handleContainerButtonClick` passe sur le
+  thread serveur, vérifie l'id du menu, le spectateur et `stillValid`, puis
+  `broadcastChanges`. `SmartChestMenu.clickMenuButton` : id hors des 4 modes
+  refusé ; le mode est noté des deux côtés (le bouton s'enfonce tout de suite),
+  le serveur seul range, après `resetQuickCraft`.
+- **Mode** : `SmartChestSorting.Mode`, champ du block entity, clé `sort_mode`
+  (nom du mode en minuscules ; absente ou inconnue : Catégorie, donc un coffre
+  0.1.0 se charge tel quel). Envoyé au client par un `DataSlot` du menu, lu sur
+  la moitié principale ; celui de la moitié secondaire est gardé, sans effet.
+- **Regroupement** (`SmartChestSorting.sort`) : copies des piles non vides,
+  fusionnées dans l'ordre des cases avec une pile identique
+  (`isSameItemSameComponents`) jusqu'au plafond (`maxStackSize`, amélioration
+  de la moitié principale). Chaque case donne au plus une pile (ce qui lui
+  reste une fois versée dans les piles identiques précédentes) : jamais plus de
+  piles qu'avant, tout tient toujours ; une pile au-dessus d'un plafond baissé
+  ne fait que donner. Garde-fou : rien n'est écrit si le compte par objet change (erreur
+  au log). Tri stable, cases vides à la fin, seules les cases changées sont
+  écrites (`ItemStack.matches`) par `setItem`, qui ne tronque pas (§4.1).
+- **Ordres** : à égalité sur la clé du mode, les piles identiques restent
+  groupées (rang de la première d'entre elles : sinon potions ou livres
+  enchantés s'entrelacent), la plus grosse d'abord, puis l'ordre des cases.
+  Catégorie : premier rang de l'objet dans les onglets `CATEGORY`, dans l'ordre
+  du registre (celui de l'écran), puis l'ID ; objet absent des onglets à la
+  fin. Nom : `getHoverName().getString()` par un `Collator` (« É » avec « E ») ;
+  ⚠️ langue du serveur : celle du jeu en solo, l'anglais sur un serveur dédié.
+  Quantité : total de l'objet dans le coffre, décroissant, puis Catégorie. ID :
+  `namespace:path`.
+- ⚠️ **Ordre des onglets côté serveur** : `CreativeModeTabs` est dans le jar
+  commun, mais `tryRebuildTabContents` remplit des champs statiques que
+  l'écran créatif vérifie **à chaque tick** (`containerTick` →
+  `tryRefreshInvalidatedTabs`) et reconstruit dès que les registres diffèrent,
+  comparés par identité (`ItemDisplayParameters.needsUpdate`) : en solo, ceux
+  du serveur intégré feraient reconstruire chaque côté à tour de rôle, sur deux
+  threads, pendant que l'autre les lit. `SmartChestSorting.rebuild` (démarrage du
+  serveur et `/reload`, comme la table de compression) appelle donc le
+  générateur de chaque onglet (`displayItemsGenerator`, ouvert par l'access
+  widener) dans ses propres listes, puis les deux événements que Fabric lance
+  en fin de `buildContents` (`modifyOutputEvent(clé)`, `MODIFY_OUTPUT_ALL`, sur
+  un `FabricCreativeModeTabOutput`) : les objets que les mods ajoutent ainsi
+  (les nôtres compris) sont à leur place. Permissions comprises (onglet
+  opérateur). Un onglet qui lève une exception est écarté, avec un
+  avertissement. Log : `Sorting order: N items from the creative tabs`.
+- **Après compression** : `SmartChestCompression.compress` rend s'il a changé
+  quelque chose ; `SmartChestBlock.compress` range alors dans le mode de la
+  moitié principale, puis recompresse tant que ça change (la fusion peut
+  libérer la case qui manquait à un bloc ; fin assurée, chaque compression
+  baisse le nombre d'objets). Les écritures du tri relèvent le drapeau, baissé
+  juste après : le tick suivant ne fait rien. Un coffre dont aucun bouton n'a
+  été pressé (un coffre 0.1.0 compris) se range en Catégorie.
+- **Écran** : 4 `ImageButton` de 16 × 16, à 2 px à gauche du cadre, à partir de
+  y 4. Cadres normal, survolé, enfoncé et une icône par mode (quatre carrés de
+  couleur, A et flèche, barres décroissantes, #), dessinés par
+  `tools/GenerateUpgrades.java`. ⚠️ Hors du cadre, un relâchement sur un bouton
+  comptait comme un clic dehors (`hasClickedOutside`, case -999) et **jetait
+  l'objet porté** : surchargé pour la colonne des boutons, comme le bouton du
+  livre de recettes. Inactifs pour un spectateur (le serveur refuse ses clics,
+  le bouton enfoncé serait faux).
+
+Implémenté à l'étape : 10.
+
 ---
 
 ## 6. Configuration 🔷
@@ -384,7 +495,7 @@ Format et rechargement : 🔷 JSON dans `config/smartchest.json`, lu au démarra
 | Nom affiché du mod | Smart Chest | ✅ |
 | Package racine | `re.jerome.smartchest` | 🔷 |
 | `group` Gradle | `re.jerome` | ✅ |
-| Version | `0.1.0+26.3` | ✅ |
+| Version | `0.2.0+26.3` (étape 10) ; `0.1.0+26.3` publiée | ✅ |
 | Versions du jeu | 26.3 uniquement | ✅ |
 | Licence | **MIT**, `Copyright (c) 2026 Jerome` | 🔷 |
 
@@ -431,7 +542,8 @@ Gradle `9.6.0`, JDK `25`, aucune mappings. Loom **1.17**, pas 1.18.
   améliorations. `GenerateWoods` ne contrôle plus que les fichiers de coffres
   dans les dossiers partagés.
 - **Un seul mixin** : `CopperGolemAi` (§3). Le reste passe par l'héritage et
-  les surcharges, plus un access widener pour l'item en main (ci-dessous).
+  les surcharges, plus un access widener pour l'item en main (ci-dessous) et
+  pour l'ordre des onglets créatifs (§5.2).
 - Variantes de bois : un bloc par bois, **générés par script** (modèles,
   blockstates, textures, recettes, tags) depuis une liste. Deux listes, une
   par côté : `SmartChestBlocks.ALL` (bois et planches) et `WOODS` dans
@@ -539,12 +651,14 @@ obligatoires de `CLAUDE.md`.
 | 8 | Compression | table de recettes, drapeau + tick programmé, cascade, `no_compression` | 64 émeraudes + 1 → un bloc ; quartz ne bouge jamais ; plein → rien n'est perdu | ✅ faite |
 | 8b | Compression forcée | 3 emplacements d'objet (§5.1), entrée par clic direct seulement, crafter requis, fusion et casse du double coffre | une tranche de melon posée : au-delà du plafond, 9 tranches → un melon ; quartz posé → bloc de quartz ; shift-clic et touches 1–9 n'y mettent rien ; sans crafter, rien ; relance du monde | ✅ faite |
 | 9 | Release | README (page Modrinth), version, tag, jar dans `_Publiés/` | feu vert de Jérôme | ✅ faite : release 0.1.0+26.3 publiée le 18/10/2026 ; Modrinth à la main |
+| 10 | Rangement | un bouton par mode et paquet client → serveur, regroupement au plafond de capacité, 4 modes, le dernier mémorisé dans le coffre, tri après compression, Inventory Sorter documenté (§5.2) ; version 0.2.0+26.3 | le bouton regroupe 71 + 16 citrouilles en une case et range tout dans l'ordre ; chaque mode ; une compression déclenche le tri ; double coffre ; relance du monde ; Inventory Sorter installé : son bouton disparaît après le réglage du README | ✅ faite (20/10/2026), release 0.2.0+26.3 à venir |
 
 Le « Validé quand » est ce que Jérôme joue avant toute relecture et tout
 commit. Il décrit un résultat visible en jeu, pas un état du code.
 
 Relecture par sous-agent obligatoire : étapes 4 (mixin), 7 (persistance,
-réseau, arithmétique), 8 (arithmétique, persistance).
+réseau, arithmétique), 8 (arithmétique, persistance), 10 (réseau, arithmétique,
+persistance).
 
 ---
 
@@ -583,3 +697,4 @@ réseau, arithmétique), 8 (arithmétique, persistance).
 | 18/10/2026 | Étape 8b : compression forcée (§5.1, « Implémentation »). Choix de Jérôme au plan : client optimiste (il n'a pas les recettes, le serveur juge), plus grand `N` en cas d'ambiguïté, ingrédient à reste de craft exclu, double-clic exclu des emplacements forcés, infobulle sur emplacement vide, 5 emplacements dans une colonne. **Gestes** relevés au `javap` : un seul test suffit, `input == PICKUP` dans `mayPlace` (le champ `input` de l'étape 7) ; un glisser vide part en PICKUP. ⚠️ **Ce qui s'est révélé faux** : « la compression forcée réutilise le filtre de l'étape 8 sans l'inverse » — au premier lancement, la table forcée comptait 128 règles avec bateaux, plastron de cuir, casque de tortue, armure de loup, blocs ciselés, coussins et plaques de pression ; resserrée à la grille pleine 2×2/3×3 ou 4/9 sans forme, sans durabilité (🔷, 72 règles). « Poser des planches force les établis » : faux, l'établi prend le tag `#planks`. Validé en jeu par Jérôme (melon, quartz, améthyste, neige, objet refusé qui rebondit, shift-clic, touches 1–9 et F, glisser, double-clic, sans crafter, cascade de glace, infobulle, double coffre, casse, relance, caisses de Crate Delight). **Relecture Opus** (persistance, gestes du menu, arithmétique) : ni perte ni duplication ; un coffre de l'étape 8 se charge tel quel ; seul un PICKUP sur l'emplacement y fait entrer un objet (QUICK_MOVE en boucle, SWAP 0–8 et 40, CLONE, PICKUP_ALL, glisser à un emplacement, créatif, `handleLargePile` vérifiés ; un sac au curseur dépose par PICKUP) ; correction de prédiction confirmée au `javap` (`handleContainerClick` : `suppressRemoteUpdates`, `clicked`, `setRemoteSlotUnsafe`, `setRemoteCarried`, `resumeRemoteUpdates`, `broadcastChanges`) ; terminaison et absence de cycle de la table. Corrigé : la table forcée contenait la table normale (72 règles dont 48 doublons ; une émeraude posée ne faisait rien, contre l'infobulle) — elle n'en garde que les 24 autres ; l'avertissement d'ambiguïté pouvait porter sur une règle déjà dépassée par un plus grand `N` ; commentaires et spec périmés (dont « 9 tranches → un melon » : au-delà du plafond seulement). Pas de second tour de relecture : correctifs proposés par elle. Commité en l'absence de Jérôme, à sa demande : essai du correctif (une émeraude ou une pépite rebondit hors d'un emplacement forcé ; melon, quartz et glace toujours forcés) validé par Jérôme à son retour, le 18/10/2026. |
 | 18/10/2026 | Étape 9, première moitié : `README.md` (page Modrinth, en anglais, sans image), écrit depuis SPEC et vérifié contre le code et le log (`recipe/*.json`, tags, `SmartChestConfig`, `SmartChestBlockEntity.maxStackSize`, tables du log de démarrage). ⚠️ **Ce qui s'est révélé faux** : SPEC §5.1 et le prompt parlaient de « cristaux de prismarine » et d'un « soufre » : la table forcée du log donne les **éclats** de prismarine (→ briques de prismarine, ×9), le soufre ×9 → soufre puissant et la pointe de soufre ×4 → soufre ; l'avertissement Fabric des tags ne vise que les tags d'**objets** : `tag.item.smartchest.no_capacity_upgrade` et `no_compression` ajoutés en `en_us`/`fr_fr` (le tag de blocs n'en demande pas). `build` vert, jar de 210 entrées : classes, `fabric.mod.json` (version 0.1.0+26.3, `fabric-api` seule, MIT), access widener et mixins, `LICENSE_smartchest`, aucune source ni fichier de dev. `fabric.mod.json` n'a pas de `contact` : les liens se posent après le choix du nom du dépôt. Icône : capture en jeu de Jérôme (`run/screenshots/2026-10-18_19.01.54.png`, chêne simple), recadrée en 512×512 par un script jetable, `assets/smartchest/icon.png`, déclarée dans `fabric.mod.json` ; propre au regard de Modrinth 6.2a. Pas de sous-agent : documentation et traduction. |
 | 18/10/2026 | Étape 9, fin : README validé par Jérôme ; icône = capture en jeu recadrée ; dépôt public `Jacob-Ps231/smart-chest` (nom choisi par Jérôme), tag annoté `0.1.0+26.3` sur 5950993, push de `main` et du tag, release GitHub avec `smartchest-0.1.0+26.3.jar` (jar bâti par `clean build` sur le tag, copié dans `_Publiés/`). Chaque action sur feu vert explicite de Jérôme. ⚠️ Le classificateur de l'app a d'abord refusé `gh repo create` (surface publique) : il faut un accord donné dans le chat sur l'action précise. |
+| 20/10/2026 | Étape 10 : rangement (§5.2, « Implémentation »). **Choix de Jérôme au plan** : un bouton par mode plutôt qu'un bouton à mode tournant (molette, Maj+clic : abandonnés), en colonne en haut à gauche ; le tri après compression suit le dernier bouton utilisé, mémorisé dans le coffre. Relevé au `javap` : le paquet vanilla des boutons de menu (`ServerboundContainerButtonClickPacket`, tailleur de pierre) fait thread serveur, id du menu, spectateur et `stillValid` lui-même — aucun payload Fabric (networking 6.3.10 vérifié, inutile) ; `CreativeModeTabs` est dans le jar commun, mais son cache est partagé avec l'écran créatif du client en solo, d'où une table construite à part, générateurs et événements Fabric rejoués (1679 objets en vanilla + Crate Delight, aucun onglet écarté) ; Inventory Sorter 3.0.1 n'a **aucune voie officielle pour un autre mod** (plugins en liste interne, Trinkets seul) : documenté dans le README. ⚠️ **Ce qui s'est révélé faux** : « paquet client → serveur » au sens d'un paquet maison — le paquet vanilla suffit ; « masquer le bouton d'Inventory Sorter par son système de compatibilité » — il n'en offre pas ; « appeler `tryRebuildTabContents` côté serveur » — course entre threads en solo ; « une pile n'est jamais coupée » (première version de la spec) — une case peut se partager entre une pile précédente et la sienne, la garantie est « au plus une pile par case ». Validé en jeu par Jérôme (regroupement 71 + 16 avec et sans amélioration, chaque mode, potions au-delà de 64, tri après compression, dépôt simple sans tri, double coffre, relance, Inventory Sorter masqué par sa config). **Relecture Opus** (réseau, arithmétique, persistance) : ni perte ni duplication, réseau sûr, boucles finies, `sort_mode` chargé tel quel d'un coffre 0.1.0, contrat des comparateurs et idempotence vérifiés. Corrigé : **un relâchement sur un bouton, hors du cadre, jetait l'objet porté** (`hasClickedOutside`, case -999) ; les piles d'un même objet aux composants différents s'entrelaçaient (groupe de la première pile identique) ; bouton enfoncé à tort chez un spectateur (boutons inactifs) ; le tri après compression pouvait libérer une case sans recompresser (boucle compression → tri) ; commentaires et docs inexacts. Essai des correctifs validé par Jérôme. Laissé : alterner les modes très vite réécrit jusqu'à 54 cases par clic. Pas de second tour de relecture : correctifs proposés par elle, signature `hasClickedOutside(DDII)` lue au `javap`. |
